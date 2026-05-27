@@ -1,0 +1,76 @@
+write_log:
+  name: Write Log Entry
+  description: Manually write a LOG row to hass-console-logs.csv
+  fields:
+    entity:
+      name: Entity
+      description: The hass_console entity name (e.g. hass_console.log_daily_kwh)
+      required: true
+      example: "hass_console.log_daily_kwh"
+      selector:
+        text:
+    value:
+      name: Value
+      description: The value to record
+      required: false
+      example: "42.5"
+      selector:
+        text:
+    note:
+      name: Note
+      description: A note to attach to the log entry
+      required: false
+      example: "Daily energy reading"
+      selector:
+        text:
+
+write_alarm:
+  name: Write Alarm Entry
+  description: Manually write an ALARM row to hass-console-alarms.csv
+  fields:
+    entity:
+      name: Entity
+      description: The hass_console entity name (e.g. hass_console.alarm_temperature_alarm)
+      required: true
+      example: "hass_console.alarm_temperature_alarm"
+      selector:
+        text:
+    class:
+      name: Class
+      description: Alarm class/severity (e.g. 01, 02, 03)
+      required: false
+      example: "01"
+      selector:
+        text:
+    value:
+      name: Value
+      description: The value that triggered the alarm
+      required: false
+      example: "82.3"
+      selector:
+        text:
+    duration:
+      name: Duration
+      description: How long the condition was active before alarm
+      required: false
+      example: "0:10:00"
+      selector:
+        text:
+    note:
+      name: Note
+      description: A note to attach to the alarm entry
+      required: false
+      example: "Network closet overheating"
+      selector:
+        text:
+    trigger:
+      name: Trigger
+      description: Friendly alias of what triggered the alarm
+      required: false
+      example: "Above 78 for 10m"
+      selector:
+        text:
+
+reload:
+  name: Reload HASS Console
+  description: Reload the engine (re-reads config, restarts all listeners)

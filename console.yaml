@@ -1,33 +1,3 @@
-###############################
-########## console.yaml #######
-###############################
-#
-# HOW TO USE:
-# 1. Copy custom_components/console/ into your HA config/custom_components/
-# 2. Add this to configuration.yaml:
-#      console: !include console.yaml
-# 3. Restart Home Assistant
-#
-# ENTITY NAMING:
-#   Each point creates a HA entity: console.<type>_<header_lowercase>
-#   Example: DAILY_KWH with type LOG -> console.log_daily_kwh
-#
-# CSV OUTPUT: /config/www/console.csv
-#   Accessible at: http://<your-ha>:8123/local/console.csv
-#
-# TABS (row_type column in CSV):
-#   LOG   -> TIMESTAMP, ENTITY, VALUE, NOTE
-#   ALARM -> TIMESTAMP, ENTITY, CLASS, VALUE, DURATION, NOTE, TRIGGER
-#
-# CRON SYNTAX (5-field):
-#   ┌───────────── minute (0-59)
-#   │ ┌───────────── hour (0-23)
-#   │ │ ┌───────────── day of month (1-31)
-#   │ │ │ ┌───────────── month (1-12)
-#   │ │ │ │ ┌───────────── day of week (0-6, 0=Sunday)
-#   │ │ │ │ │
-#   * * * * *
-#
 # ──────────────────────────────────────────────────
 # LOG POINTS — scheduled reads of entity values
 # ──────────────────────────────────────────────────
