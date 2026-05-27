@@ -1,0 +1,107 @@
+###############################
+########## console.yaml #######
+###############################
+#
+# HOW TO USE:
+# 1. Copy custom_components/console/ into your HA config/custom_components/
+# 2. Add this to configuration.yaml:
+#      console: !include console.yaml
+# 3. Restart Home Assistant
+#
+# ENTITY NAMING:
+#   Each point creates a HA entity: console.<type>_<header_lowercase>
+#   Example: DAILY_KWH with type LOG -> console.log_daily_kwh
+#
+# CSV OUTPUT: /config/www/console.csv
+#   Accessible at: http://<your-ha>:8123/local/console.csv
+#
+# TABS (row_type column in CSV):
+#   LOG   -> TIMESTAMP, ENTITY, VALUE, NOTE
+#   ALARM -> TIMESTAMP, ENTITY, CLASS, VALUE, DURATION, NOTE, TRIGGER
+#
+# CRON SYNTAX (5-field):
+#   ┌───────────── minute (0-59)
+#   │ ┌───────────── hour (0-23)
+#   │ │ ┌───────────── day of month (1-31)
+#   │ │ │ ┌───────────── month (1-12)
+#   │ │ │ │ ┌───────────── day of week (0-6, 0=Sunday)
+#   │ │ │ │ │
+#   * * * * *
+#
+# ──────────────────────────────────────────────────
+# LOG POINTS — scheduled reads of entity values
+# ──────────────────────────────────────────────────
+
+DAILY_KWH:
+  type: LOG
+  cron: "0 0 * * *"
+  entity: sensor.energy_meter_kwh
+  note: "Daily kWh snapshot at midnight"
+
+HOURLY_HUMIDITY:
+  type: LOG
+  cron: "0 * * * *"
+  entity: sensor.living_room_humidity
+  note: "Hourly humidity reading"
+
+WEEKLY_WATER:
+  type: LOG
+  cron: "0 8 * * 1"
+  entity: sensor.water_meter_gallons
+  note: "Weekly water usage (Monday 8am)"
+
+# ──────────────────────────────────────────────────
+# ALARM POINTS — triggered by entity state conditions
+# ──────────────────────────────────────────────────
+
+TEMPERATURE_ALARM:
+  type: ALARM
+  class: "01"
+  entity: sensor.network_closet_temperature
+  note: "Network closet overheat"
+  trigger:
+    - alias: "Above 78°F for 10 min"
+      platform: numeric_state
+      entity_id: sensor.network_closet_temperature
+      above: 78
+      for:
+        minutes: 10
+
+FREEZER_ALARM:
+  type: ALARM
+  class: "02"
+  entity: sensor.garage_freezer_temperature
+  note: "Garage freezer temp rising"
+  trigger:
+    - alias: "Freezer above 10°F for 30 min"
+      platform: numeric_state
+      entity_id: sensor.garage_freezer_temperature
+      above: 10
+      for:
+        minutes: 30
+
+LOW_BATTERY:
+  type: ALARM
+  class: "03"
+  entity: sensor.ups_battery_level
+  note: "UPS battery low"
+  trigger:
+    - alias: "Battery below 20%"
+      platform: numeric_state
+      entity_id: sensor.ups_battery_level
+      below: 20
+      for:
+        minutes: 5
+
+HIGH_POWER_DRAW:
+  type: ALARM
+  class: "01"
+  entity: sensor.main_panel_watts
+  note: "Excessive power draw"
+  trigger:
+    - alias: "Above 8000W for 5 min"
+      platform: numeric_state
+      entity_id: sensor.main_panel_watts
+      above: 8000
+      for:
+        minutes: 5
