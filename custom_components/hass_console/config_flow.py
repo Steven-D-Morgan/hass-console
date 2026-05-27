@@ -9,7 +9,6 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
     DOMAIN,
@@ -28,17 +27,15 @@ def _validate_paths(data: dict[str, Any]) -> dict[str, str]:
     """Return a dict of {field_key: error_code} for any invalid paths."""
     errors: dict[str, str] = {}
 
-    yaml_path = data.get(CONF_CONSOLE_YAML, "").strip()
-    alarm_path = data.get(CONF_ALARM_CSV, "").strip()
-    log_path = data.get(CONF_LOG_CSV, "").strip()
+    yaml_path = (data.get(CONF_CONSOLE_YAML) or "").strip()
+    alarm_path = (data.get(CONF_ALARM_CSV) or "").strip()
+    log_path = (data.get(CONF_LOG_CSV) or "").strip()
 
-    # console.yaml must already exist — we don't create it for the user
     if not yaml_path:
         errors[CONF_CONSOLE_YAML] = "yaml_required"
     elif not os.path.isfile(yaml_path):
         errors[CONF_CONSOLE_YAML] = "yaml_not_found"
 
-    # CSV parents must be writable (CSVs themselves are auto-created)
     for key, path in (
         (CONF_ALARM_CSV, alarm_path),
         (CONF_LOG_CSV, log_path),
@@ -61,9 +58,7 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the user-initiated setup step."""
         # Only one instance — the engine is a singleton
         if self._async_current_entries():
@@ -81,18 +76,19 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data=user_input,
                 )
 
+        defaults = user_input or {}
         schema = vol.Schema({
             vol.Required(
                 CONF_CONSOLE_YAML,
-                default=(user_input or {}).get(CONF_CONSOLE_YAML, DEFAULT_CONSOLE_YAML),
+                default=defaults.get(CONF_CONSOLE_YAML, DEFAULT_CONSOLE_YAML),
             ): str,
             vol.Required(
                 CONF_ALARM_CSV,
-                default=(user_input or {}).get(CONF_ALARM_CSV, DEFAULT_ALARM_CSV),
+                default=defaults.get(CONF_ALARM_CSV, DEFAULT_ALARM_CSV),
             ): str,
             vol.Required(
                 CONF_LOG_CSV,
-                default=(user_input or {}).get(CONF_LOG_CSV, DEFAULT_LOG_CSV),
+                default=defaults.get(CONF_LOG_CSV, DEFAULT_LOG_CSV),
             ): str,
         })
 
@@ -104,36 +100,30 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
+    def async_get_options_flow(config_entry):
         """Return the options flow for editing settings later."""
-        return HassConsoleOptionsFlow(config_entry)
+        return HassConsoleOptionsFlow()
 
 
 class HassConsoleOptionsFlow(config_entries.OptionsFlow):
-    """Options flow — edit paths after initial setup."""
+    """Options flow — edit paths after initial setup.
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+    Note: do NOT override __init__ to store config_entry —
+    HA provides self.config_entry automatically since 2024.11.
+    """
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input=None):
         """Show/handle the options form."""
         errors: dict[str, str] = {}
-
-        # Current effective values: options override entry.data
-        current = {**self.config_entry.data, **self.config_entry.options}
+        entry = self.config_entry
+        current = {**entry.data, **entry.options}
 
         if user_input is not None:
             errors = await self.hass.async_add_executor_job(
                 _validate_paths, user_input
             )
             if not errors:
-                # Write the new values into options; HA will trigger reload
                 return self.async_create_entry(title="", data=user_input)
-            # Preserve user's input on re-render
             current = {**current, **user_input}
 
         schema = vol.Schema({
