@@ -1,0 +1,44 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up HASS Console",
+        "description": "Tell HASS Console where to find your console.yaml and where to write the CSV log files. The console.yaml file must already exist — see the README for the format. The CSV files will be created automatically on first run.",
+        "data": {
+          "console_yaml": "Console YAML path",
+          "alarm_csv": "Alarm CSV output path",
+          "log_csv": "Log CSV output path"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Console YAML path is required",
+      "yaml_not_found": "Console YAML file not found at the given path",
+      "path_required": "Path is required",
+      "parent_not_writable": "Parent directory does not exist and could not be created"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console is already configured. Only one instance is supported."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HASS Console settings",
+        "description": "Change file paths. Changes apply immediately — no restart needed.",
+        "data": {
+          "console_yaml": "Console YAML path",
+          "alarm_csv": "Alarm CSV output path",
+          "log_csv": "Log CSV output path"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Console YAML path is required",
+      "yaml_not_found": "Console YAML file not found at the given path",
+      "path_required": "Path is required",
+      "parent_not_writable": "Parent directory does not exist and could not be created"
+    }
+  }
+}

@@ -2,12 +2,18 @@
 
 A step-by-step guide to get HASS Console running. Total time: ~5 minutes.
 
+There are **two ways to set up** the integration:
+- **UI Mode (recommended)** — configure via Settings → Devices & Integrations
+- **YAML Mode (legacy)** — add `hass_console:` to configuration.yaml
+
+Both modes are supported and use the same `console.yaml` for defining alarm and log points.
+
 ---
 
 ## What You Need
 
 - Home Assistant (2024.1 or newer)
-- Access to your HA config directory (via File Editor add-on, SSH, Samba, etc.)
+- Access to your HA config directory (File Editor add-on, SSH, Samba, etc.)
 
 ---
 
@@ -30,19 +36,16 @@ Copy these into your Home Assistant config directory:
 | `custom_components/hass_console/` | `/config/custom_components/hass_console/` |
 | `www/hass-console-card.js` | `/config/www/hass-console-card.js` |
 
-If `custom_components/` or `www/` don't exist in your config directory yet, create them.
+If `custom_components/` or `www/` don't exist yet, create them.
 
 ---
 
 ## Step 3 — Create console.yaml
 
-Create a new file at `/config/console.yaml`. Start with this minimal example and swap in your own entities:
+Create `/config/console.yaml` with at least one point. Minimal example:
 
 ```yaml
 # ─── LOG EXAMPLE ───
-# Reads sensor.energy_meter_kwh every night at midnight
-# and saves the value to hass-console-logs.csv
-
 DAILY_KWH:
   type: LOG
   cron: "0 0 * * *"
@@ -51,10 +54,6 @@ DAILY_KWH:
 
 
 # ─── ALARM EXAMPLE ───
-# Watches sensor.network_closet_temperature
-# If it stays above 78 for 10 minutes, writes an alarm
-# to hass-console-alarms.csv
-
 TEMPERATURE_ALARM:
   type: ALARM
   class: "01"
@@ -71,7 +70,28 @@ TEMPERATURE_ALARM:
 
 ---
 
-## Step 4 — Edit configuration.yaml
+## Step 4 — Restart Home Assistant
+
+Settings → System → Restart. A full restart is required because this is a custom integration.
+
+---
+
+## Step 5 — Set Up the Integration
+
+### Option A — UI Mode (Recommended)
+
+1. Go to **Settings → Devices & Services**
+2. Click **+ Add Integration** (bottom right)
+3. Search for **HASS Console**
+4. Confirm the three paths (defaults are usually correct):
+   - **Console YAML path** — `/config/console.yaml`
+   - **Alarm CSV output path** — `/config/www/hass-console-alarms.csv`
+   - **Log CSV output path** — `/config/www/hass-console-logs.csv`
+5. Click **Submit**
+
+You'll see a HASS Console card on the Integrations page with a **Configure** button (to change paths later) and a **⋮ → Reload** option.
+
+### Option B — YAML Mode (Legacy)
 
 Add this one line to `/config/configuration.yaml`:
 
@@ -79,39 +99,27 @@ Add this one line to `/config/configuration.yaml`:
 hass_console: !include console.yaml
 ```
 
----
+Restart HA again.
 
-## Step 5 — Register the Card
-
-In Home Assistant:
-
-1. Go to **Settings → Dashboards**
-2. Click the **⋮** menu (top right) → **Resources**
-3. Click **Add Resource**
-4. URL: `/local/hass-console-card.js`
-5. Type: **JavaScript Module**
-6. Click **Create**
+> **Note:** In YAML mode, the CSV paths are fixed at the defaults. Use UI mode if you want custom paths.
 
 ---
 
-## Step 6 — Restart Home Assistant
+## Step 6 — Register the Lovelace Card
 
-Go to **Settings → System → Restart** and do a full restart.
-
-After restart, the integration will automatically create:
-- `/config/www/hass-console-alarms.csv`
-- `/config/www/hass-console-logs.csv`
-
-You don't need to create the CSV files — they're generated on first boot.
+1. **Settings → Dashboards → ⋮ (top right) → Resources**
+2. Click **Add Resource**
+3. URL: `/local/hass-console-card.js`
+4. Type: **JavaScript Module**
+5. Click **Create**
 
 ---
 
 ## Step 7 — Add the Card to a Dashboard
 
-1. Open any dashboard
-2. Click **Edit** (pencil icon) → **Add Card**
-3. Scroll down and choose **Manual**
-4. Paste this:
+1. Open any dashboard, click **Edit** (pencil icon) → **Add Card**
+2. Scroll down and choose **Manual**
+3. Paste this:
 
 ```yaml
 type: custom:hass-console-card
@@ -122,13 +130,15 @@ rows: 200
 refresh_interval: 30
 ```
 
-5. Click **Save**
+4. Click **Save**
 
 ---
 
 ## You're Done
 
-The card will show two tabs — **Alarm** and **Log**. They'll be empty until your first cron fires or an alarm triggers. To test immediately, go to **Developer Tools → Services** and run:
+The card will show two tabs — **Alarm** and **Log**. They'll be empty until your first cron fires or an alarm triggers.
+
+To test immediately, go to **Developer Tools → Services** and run:
 
 ```yaml
 service: hass_console.write_log
@@ -142,15 +152,18 @@ Switch to the Log tab on your card, click **↻ Refresh**, and you should see th
 
 ---
 
-## Adding More Points
+## Editing Your Configuration
 
-Open `/config/console.yaml` and add more entries. You don't need to restart HA — just call the reload service:
+### Adding more points
 
-**Developer Tools → Services:**
+Open `/config/console.yaml` and add more entries. To pick up the changes without restarting HA:
 
-```yaml
-service: hass_console.reload
-```
+- **UI Mode:** Settings → Devices & Services → HASS Console → **⋮ → Reload**
+- **YAML Mode:** Developer Tools → Services → call `hass_console.reload`
+
+### Changing file paths (UI Mode only)
+
+Settings → Devices & Services → HASS Console → **Configure**. Changes apply immediately.
 
 ---
 
