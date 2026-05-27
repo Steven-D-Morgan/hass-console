@@ -12,7 +12,7 @@ from typing import Any
 import voluptuous as vol
 import yaml
 
-from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_ALIAS,
     CONF_ENTITY_ID,
@@ -33,10 +33,10 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
-    CONF_TYPE, CONF_CRON, CONF_ENTITY, CONF_NOTE, CONF_CLASS, CONF_TRIGGER,
+    CONF_TYPE, CONF_CRON, CONF_ENTITY, CONF_NOTE, CONF_CLASS, CONF_TRIGGER, CONF_CATEGORY,
     CONF_CONSOLE_YAML, CONF_ALARM_CSV, CONF_LOG_CSV,
     DEFAULT_CONSOLE_YAML, DEFAULT_ALARM_CSV, DEFAULT_LOG_CSV,
-    ALARM_COLUMNS, LOG_COLUMNS, TYPE_LOG, TYPE_ALARM,
+    ALARM_COLUMNS, LOG_COLUMNS, TIMESTAMP_FORMAT, TYPE_LOG, TYPE_ALARM,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -112,23 +112,52 @@ class HassConsoleEngine:
         self._log_lock = asyncio.Lock()
 
     async def async_setup(self) -> None:
-        self._ensure_csvs()
+        await self.hass.async_add_executor_job(self._ensure_csvs)
         self._parse_points()
         await self._setup_cron_scanner()
         self._setup_alarm_listeners()
         _LOGGER.info("HASS Console engine started: %d points loaded", len(self.points))
 
     def _ensure_csvs(self) -> None:
+        """Create CSVs if missing, or migrate them to the current schema."""
         self._alarm_csv.parent.mkdir(parents=True, exist_ok=True)
         self._log_csv.parent.mkdir(parents=True, exist_ok=True)
-        if not self._alarm_csv.exists():
-            with open(self._alarm_csv, "w", newline="") as f:
-                csv.writer(f).writerow(ALARM_COLUMNS)
-            _LOGGER.info("Created alarm CSV at %s", self._alarm_csv)
-        if not self._log_csv.exists():
-            with open(self._log_csv, "w", newline="") as f:
-                csv.writer(f).writerow(LOG_COLUMNS)
-            _LOGGER.info("Created log CSV at %s", self._log_csv)
+        self._migrate_or_create(self._alarm_csv, ALARM_COLUMNS)
+        self._migrate_or_create(self._log_csv, LOG_COLUMNS)
+
+    def _migrate_or_create(self, path: Path, expected_columns: list[str]) -> None:
+        """Create the CSV with the expected header, or migrate an existing one."""
+        if not path.exists():
+            with open(path, "w", newline="") as f:
+                csv.writer(f).writerow(expected_columns)
+            _LOGGER.info("Created CSV at %s", path)
+            return
+
+        # Read existing header
+        with open(path, "r", newline="") as f:
+            reader = csv.reader(f)
+            try:
+                existing_header = next(reader)
+            except StopIteration:
+                existing_header = []
+
+        if existing_header == expected_columns:
+            return
+
+        # Migrate: read all rows as dicts, fill missing columns with "", write back
+        _LOGGER.info(
+            "Migrating CSV %s: %s -> %s",
+            path, existing_header, expected_columns,
+        )
+        with open(path, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        with open(path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=expected_columns)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({col: row.get(col, "") for col in expected_columns})
 
     def _parse_points(self) -> None:
         for name, point_cfg in self.config.items():
@@ -147,6 +176,7 @@ class HassConsoleEngine:
                 "cron": point_cfg.get(CONF_CRON),
                 "note": point_cfg.get(CONF_NOTE, ""),
                 "class": point_cfg.get(CONF_CLASS, ""),
+                "category": str(point_cfg.get(CONF_CATEGORY, "")).strip(),
                 "trigger": point_cfg.get(CONF_TRIGGER, []),
             }
 
@@ -240,7 +270,8 @@ class HassConsoleEngine:
             state = self.hass.states.get(source)
             if state: value = state.state
         row = {
-            "timestamp": now.isoformat(),
+            "timestamp": now.strftime(TIMESTAMP_FORMAT),
+            "category": point.get("category", ""),
             "entity": point["entity_id"],
             "value": value,
             "note": point.get("note", ""),
@@ -250,7 +281,8 @@ class HassConsoleEngine:
             point["entity_id"], value,
             {
                 "friendly_name": f"HASS Console Log: {point['header']}",
-                "last_logged": now.isoformat(),
+                "last_logged": now.strftime(TIMESTAMP_FORMAT),
+                "category": point.get("category", ""),
                 "note": point.get("note", ""),
             },
         )
@@ -262,7 +294,8 @@ class HassConsoleEngine:
     ) -> None:
         dur_str = str(timedelta(seconds=int(duration)))
         row = {
-            "timestamp": now.isoformat(),
+            "timestamp": now.strftime(TIMESTAMP_FORMAT),
+            "category": point.get("category", ""),
             "entity": point["entity_id"],
             "class": point.get("class", ""),
             "value": str(value),
@@ -275,7 +308,8 @@ class HassConsoleEngine:
             point["entity_id"], "ALARM",
             {
                 "friendly_name": f"HASS Console Alarm: {point['header']}",
-                "last_alarm": now.isoformat(),
+                "last_alarm": now.strftime(TIMESTAMP_FORMAT),
+                "category": point.get("category", ""),
                 "class": point.get("class", ""),
                 "value": str(value),
                 "duration": dur_str,
@@ -314,7 +348,6 @@ class HassConsoleEngine:
 # ──────────────────────────────────────────────────────────────────
 
 def _load_yaml_sync(path: str) -> dict[str, Any]:
-    """Read and parse a YAML file synchronously."""
     try:
         with open(path, "r") as f:
             data = yaml.safe_load(f) or {}
@@ -329,15 +362,11 @@ def _load_yaml_sync(path: str) -> dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register services and handle YAML-based setup if present."""
-    # Always register services (work in both YAML and config-entry modes)
     _register_services(hass)
 
     if DOMAIN not in config:
-        # Pure config-entry mode — async_setup_entry will handle the engine
         return True
 
-    # Legacy YAML mode — points defined inline under hass_console:
     points_config = config[DOMAIN]
     engine = HassConsoleEngine(hass, points_config, DEFAULT_ALARM_CSV, DEFAULT_LOG_CSV)
     hass.data.setdefault(DOMAIN, {})["_yaml_engine"] = engine
@@ -355,8 +384,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 # ──────────────────────────────────────────────────────────────────
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up HASS Console from a config entry."""
-    # Effective settings: options override data
     settings = {**entry.data, **entry.options}
     yaml_path = settings.get(CONF_CONSOLE_YAML, DEFAULT_CONSOLE_YAML)
     alarm_csv = settings.get(CONF_ALARM_CSV, DEFAULT_ALARM_CSV)
@@ -367,7 +394,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     engine = HassConsoleEngine(hass, points, alarm_csv, log_csv)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = engine
 
-    # Start now if HA is already up; otherwise wait for start event
     if hass.is_running:
         await engine.async_setup()
     else:
@@ -375,7 +401,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await engine.async_setup()
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _start)
 
-    # Reload on options changes
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     _LOGGER.info(
@@ -386,7 +411,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Tear down the engine for this entry."""
     domain_data = hass.data.get(DOMAIN, {})
     engine: HassConsoleEngine | None = domain_data.pop(entry.entry_id, None)
     if engine:
@@ -395,7 +419,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload the entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -404,11 +427,9 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 # ──────────────────────────────────────────────────────────────────
 
 def _get_active_engine(hass: HomeAssistant) -> HassConsoleEngine | None:
-    """Get whichever engine is currently active (YAML or entry-based)."""
     domain_data = hass.data.get(DOMAIN, {})
     if not domain_data:
         return None
-    # Prefer entry-based engines over the YAML one
     for key, value in domain_data.items():
         if key != "_yaml_engine" and isinstance(value, HassConsoleEngine):
             return value
@@ -416,15 +437,15 @@ def _get_active_engine(hass: HomeAssistant) -> HassConsoleEngine | None:
 
 
 def _register_services(hass: HomeAssistant) -> None:
-    """Register services once at integration load time."""
     if hass.services.has_service(DOMAIN, "write_log"):
-        return  # Already registered
+        return
 
     async def _handle_write_log(call) -> None:
         engine = _get_active_engine(hass)
         if not engine: return
         row = {
-            "timestamp": dt_util.now().isoformat(),
+            "timestamp": dt_util.now().strftime(TIMESTAMP_FORMAT),
+            "category": call.data.get("category", ""),
             "entity": call.data.get("entity", ""),
             "value": call.data.get("value", ""),
             "note": call.data.get("note", ""),
@@ -435,7 +456,8 @@ def _register_services(hass: HomeAssistant) -> None:
         engine = _get_active_engine(hass)
         if not engine: return
         row = {
-            "timestamp": dt_util.now().isoformat(),
+            "timestamp": dt_util.now().strftime(TIMESTAMP_FORMAT),
+            "category": call.data.get("category", ""),
             "entity": call.data.get("entity", ""),
             "class": call.data.get("class", ""),
             "value": call.data.get("value", ""),
@@ -446,14 +468,12 @@ def _register_services(hass: HomeAssistant) -> None:
         await engine._write_alarm_row(row)
 
     async def _handle_reload(call) -> None:
-        # Reload all config entries (UI-mode); YAML mode requires HA restart
         entries = hass.config_entries.async_entries(DOMAIN)
         if entries:
             for entry in entries:
                 await hass.config_entries.async_reload(entry.entry_id)
             _LOGGER.info("Reloaded %d HASS Console entries", len(entries))
             return
-        # Legacy YAML fallback — re-run engine setup
         engine = _get_active_engine(hass)
         if engine:
             await engine.async_teardown()
@@ -464,6 +484,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN, "write_log", _handle_write_log,
         schema=vol.Schema({
             vol.Required("entity"): cv.string,
+            vol.Optional("category", default=""): cv.string,
             vol.Optional("value", default=""): cv.string,
             vol.Optional("note", default=""): cv.string,
         }),
@@ -472,6 +493,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN, "write_alarm", _handle_write_alarm,
         schema=vol.Schema({
             vol.Required("entity"): cv.string,
+            vol.Optional("category", default=""): cv.string,
             vol.Optional("class", default=""): cv.string,
             vol.Optional("value", default=""): cv.string,
             vol.Optional("duration", default=""): cv.string,

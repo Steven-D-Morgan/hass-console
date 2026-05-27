@@ -6,19 +6,29 @@ DAILY_KWH:
   type: LOG
   cron: "0 0 * * *"
   entity: sensor.energy_meter_kwh
+  category: E-METER
   note: "Daily kWh snapshot at midnight"
 
 HOURLY_HUMIDITY:
   type: LOG
   cron: "0 * * * *"
   entity: sensor.living_room_humidity
+  category: HVAC
   note: "Hourly humidity reading"
 
 WEEKLY_WATER:
   type: LOG
   cron: "0 8 * * 1"
   entity: sensor.water_meter_gallons
+  category: W-METER
   note: "Weekly water usage (Monday 8am)"
+
+CAR_LOCATION:
+  type: LOG
+  cron: "*/15 * * * *"
+  entity: device_tracker.my_car
+  category: GPS
+  note: "Vehicle location every 15 minutes"
 
 # ──────────────────────────────────────────────────
 # ALARM POINTS — triggered by entity state conditions
@@ -27,6 +37,7 @@ WEEKLY_WATER:
 TEMPERATURE_ALARM:
   type: ALARM
   class: "01"
+  category: HVAC
   entity: sensor.network_closet_temperature
   note: "Network closet overheat"
   trigger:
@@ -40,6 +51,7 @@ TEMPERATURE_ALARM:
 FREEZER_ALARM:
   type: ALARM
   class: "02"
+  category: HVAC
   entity: sensor.garage_freezer_temperature
   note: "Garage freezer temp rising"
   trigger:
@@ -53,6 +65,7 @@ FREEZER_ALARM:
 LOW_BATTERY:
   type: ALARM
   class: "03"
+  category: UPS
   entity: sensor.ups_battery_level
   note: "UPS battery low"
   trigger:
@@ -66,6 +79,7 @@ LOW_BATTERY:
 HIGH_POWER_DRAW:
   type: ALARM
   class: "01"
+  category: E-METER
   entity: sensor.main_panel_watts
   note: "Excessive power draw"
   trigger:
