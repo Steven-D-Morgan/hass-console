@@ -3,7 +3,7 @@
   "name": "HASS Console - Alarm & Log Engine",
   "documentation": "https://github.com/Steven-D-Morgan/hass-console",
   "issue_tracker": "https://github.com/Steven-D-Morgan/hass-console/issues",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "config_flow": true,
   "codeowners": ["@Steven-D-Morgan"],
   "dependencies": [],

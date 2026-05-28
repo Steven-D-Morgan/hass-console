@@ -13,17 +13,20 @@ DEFAULT_ALARM_CSV = "/config/www/hass-console-alarms.csv"
 DEFAULT_LOG_CSV = "/config/www/hass-console-logs.csv"
 
 # CSV column schemas
-ALARM_COLUMNS = ["timestamp", "category", "entity", "class", "value", "duration", "note", "trigger"]
+ALARM_COLUMNS = [
+    "id", "timestamp", "category", "entity", "class",
+    "value", "duration", "note", "trigger", "ack",
+]
 LOG_COLUMNS = ["timestamp", "category", "entity", "value", "note"]
 
-# Timestamp format — clean for Excel
+# Timestamp format
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Point types
 TYPE_LOG = "LOG"
 TYPE_ALARM = "ALARM"
 
-# YAML config keys (point definitions)
+# YAML config keys
 CONF_TYPE = "type"
 CONF_CRON = "cron"
 CONF_ENTITY = "entity"

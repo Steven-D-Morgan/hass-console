@@ -4,30 +4,24 @@ write_log:
   fields:
     entity:
       name: Entity
-      description: The hass_console entity name (e.g. hass_console.log_daily_kwh)
       required: true
       example: "hass_console.log_daily_kwh"
       selector:
         text:
     category:
       name: Category
-      description: System type — e.g. HVAC, GPS, E-METER, W-METER
+      description: System type (e.g. HVAC, E-METER, GPS)
       required: false
-      example: "E-METER"
       selector:
         text:
     value:
       name: Value
-      description: The value to record
       required: false
-      example: "42.5"
       selector:
         text:
     note:
       name: Note
-      description: A note to attach to the log entry
       required: false
-      example: "Daily energy reading"
       selector:
         text:
 
@@ -37,51 +31,68 @@ write_alarm:
   fields:
     entity:
       name: Entity
-      description: The hass_console entity name (e.g. hass_console.alarm_temperature_alarm)
       required: true
       example: "hass_console.alarm_temperature_alarm"
       selector:
         text:
     category:
       name: Category
-      description: System type — e.g. HVAC, GPS, E-METER, W-METER
       required: false
-      example: "HVAC"
       selector:
         text:
     class:
       name: Class
-      description: Alarm class/severity (e.g. 01, 02, 03)
+      description: Alarm severity (01, 02, 03)
       required: false
-      example: "01"
       selector:
         text:
     value:
       name: Value
-      description: The value that triggered the alarm
       required: false
-      example: "82.3"
       selector:
         text:
     duration:
       name: Duration
-      description: How long the condition was active before alarm
       required: false
-      example: "0:10:00"
       selector:
         text:
     note:
       name: Note
-      description: A note to attach to the alarm entry
       required: false
-      example: "Network closet overheating"
       selector:
         text:
     trigger:
       name: Trigger
-      description: Friendly alias of what triggered the alarm
       required: false
-      example: "Above 78 for 10m"
+      selector:
+        text:
+
+acknowledge_alarm:
+  name: Acknowledge Alarm
+  description: Mark a single alarm as acknowledged by its ID
+  fields:
+    id:
+      name: Alarm ID
+      description: The unique ID of the alarm row (from the CSV id column)
+      required: true
+      example: "a1b2c3d4"
+      selector:
+        text:
+    note:
+      name: Note
+      description: Optional acknowledgment note
+      required: false
+      selector:
+        text:
+
+acknowledge_all:
+  name: Acknowledge All Alarms
+  description: Mark all unacknowledged alarms as acknowledged
+  fields:
+    note:
+      name: Note
+      description: Optional acknowledgment note
+      required: false
       selector:
         text:
 

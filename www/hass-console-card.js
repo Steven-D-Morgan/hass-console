@@ -1,11 +1,5 @@
 /**
- * HASS Console Card v2.2.0 — Niagara-style Alarm & Log viewer
- *
- * INSTALL:
- *   1. Copy to /config/www/hass-console-card.js
- *   2. Settings → Dashboards → Resources → Add:
- *        /local/hass-console-card.js  (JavaScript Module)
- *   3. Add Manual card: type: custom:hass-console-card
+ * HASS Console Card v2.3.0
  *
  * CONFIG:
  *   type: custom:hass-console-card
@@ -15,506 +9,244 @@
  *   rows: 200
  *   refresh_interval: 30
  */
+const VER="2.3.0";
+function parseTS(v){if(!v)return null;const n=v.indexOf(' ')!==-1&&v.indexOf('T')===-1?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
-const CARD_VERSION = "2.2.0";
+class HassConsoleCard extends HTMLElement{
+constructor(){super();this.attachShadow({mode:"open"});this._c={};this._alarm=[];this._log=[];this._tab="ALARM";this._timer=null;this._sortCol=null;this._sortDir="desc";
+this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false}
 
-// Parse the engine's "YYYY-MM-DD HH:MM:SS" format (also handles legacy ISO timestamps)
-function parseTimestamp(val) {
-  if (!val) return null;
-  const normalized = (val.indexOf(' ') !== -1 && val.indexOf('T') === -1)
-    ? val.replace(' ', 'T') : val;
-  const d = new Date(normalized);
-  return isNaN(d.getTime()) ? null : d;
+setConfig(c){this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console-alarms.csv",log_csv:c.log_csv||"/local/hass-console-logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30}}
+
+set hass(h){this._hass=h;if(!this._init){this._init=true;this._render();this._fetch();this._startRefresh()}}
+
+_startRefresh(){if(this._timer)clearInterval(this._timer);this._timer=setInterval(()=>this._fetch(),this._c.refresh*1000)}
+
+async _fetch(){await Promise.all([this._fetchOne("alarm"),this._fetchOne("log")]);this._update()}
+async _fetchOne(t){try{const u=t==="alarm"?this._c.alarm_csv:this._c.log_csv;const r=await fetch(u+`?_=${Date.now()}`);if(!r.ok){if(t==="alarm")this._alarm=[];else this._log=[];return}
+const rows=this._parseCSV(await r.text());if(t==="alarm")this._alarm=rows;else this._log=rows}catch(e){console.error("HASS Console fetch:",e)}}
+
+_parseCSV(text){const lines=text.trim().split("\n");if(lines.length<2)return[];const hdr=this._splitLine(lines[0]);const out=[];
+for(let i=1;i<lines.length;i++){const cols=this._splitLine(lines[i]);if(cols.length<hdr.length)continue;const row={};hdr.forEach((h,j)=>row[h.trim()]=cols[j]?.trim()||"");out.push(row)}return out}
+_splitLine(l){const r=[];let c="",q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch==='"')q=!q;else if(ch===","&&!q){r.push(c);c=""}else c+=ch}r.push(c);return r}
+
+_data(){return this._tab==="ALARM"?this._alarm:this._log}
+_unackCount(){return this._alarm.filter(r=>!r.ack).length}
+_distClasses(){const s=new Set;this._alarm.forEach(r=>{if(r.class)s.add(r.class)});return[...s].sort()}
+_distCats(){const s=new Set;this._data().forEach(r=>{if(r.category)s.add(r.category)});return[...s].sort()}
+_distEnts(){const s=new Set;this._data().forEach(r=>{if(r.entity)s.add(r.entity)});return[...s].sort()}
+
+_rows(){
+let rows=[...this._data()];
+// Default: hide acknowledged alarms
+if(this._tab==="ALARM"&&!this._showAck)rows=rows.filter(r=>!r.ack);
+if(this._fText){const ft=this._fText.toLowerCase();rows=rows.filter(r=>Object.values(r).some(v=>v.toLowerCase().includes(ft)))}
+if(this._fClass.size>0&&this._tab==="ALARM")rows=rows.filter(r=>this._fClass.has(r.class||""));
+if(this._fCat.size>0)rows=rows.filter(r=>this._fCat.has(r.category||""));
+if(this._fEnt.size>0)rows=rows.filter(r=>this._fEnt.has(r.entity||""));
+if(this._fFrom){const f=new Date(this._fFrom+"T00:00:00");rows=rows.filter(r=>{const d=parseTS(r.timestamp);return d?d>=f:true})}
+if(this._fTo){const t=new Date(this._fTo+"T23:59:59");rows=rows.filter(r=>{const d=parseTS(r.timestamp);return d?d<=t:true})}
+if(this._sortCol){rows.sort((a,b)=>{const va=a[this._sortCol]||"",vb=b[this._sortCol]||"";const c=va.localeCompare(vb,undefined,{numeric:true});return this._sortDir==="asc"?c:-c})}
+else rows.reverse();
+return rows.slice(0,this._c.rows)}
+
+_cntFilters(){let n=0;if(this._fClass.size>0)n++;if(this._fCat.size>0)n++;if(this._fEnt.size>0)n++;if(this._fFrom)n++;if(this._fTo)n++;return n}
+_clearFilters(){this._fClass.clear();this._fCat.clear();this._fEnt.clear();this._fFrom="";this._fTo="";this._fText="";
+const fi=this.shadowRoot.getElementById("filter");if(fi)fi.value="";this._updatePanel();this._update()}
+
+// ── Acknowledge ──
+async _ack(id){if(!this._hass)return;await this._hass.callService("hass_console","acknowledge_alarm",{id});await this._fetch()}
+async _ackAll(){if(!this._hass)return;await this._hass.callService("hass_console","acknowledge_all",{});await this._fetch()}
+
+// ── Render ──
+_render(){
+const S=`
+:host{--bg:#0c1117;--sf:#141b24;--bd:#1e2a36;--tx:#c8d6e0;--dim:#6b7f8e;--ac:#00d4aa;--red:#ff4757;--amb:#ffa502;--blu:#3b82f6;--hbg:#0f1820;--hov:rgba(0,212,170,.06);--fn:"SF Mono","Cascadia Code","JetBrains Mono","Fira Code",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{background:var(--bg);border:1px solid var(--bd);border-radius:12px;overflow:hidden;font-family:var(--fn);font-size:12px;color:var(--tx)}
+.hbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--sf);border-bottom:1px solid var(--bd)}
+.htitle{font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--ac);display:flex;align-items:center;gap:8px}
+.htitle .dot{width:8px;height:8px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hmeta{font-size:11px;color:var(--dim)}
+.tbar{display:flex;background:var(--hbg);border-bottom:2px solid var(--bd)}
+.tbtn{flex:1;padding:10px 0;text-align:center;font-family:var(--fn);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);background:none;border:none;cursor:pointer;position:relative;transition:color .2s}
+.tbtn:hover{color:var(--tx)}.tbtn.active{color:var(--ac)}
+.tbtn.active::after{content:"";position:absolute;bottom:-2px;left:10%;width:80%;height:2px;background:var(--ac);border-radius:1px}
+.badge{display:inline-block;min-width:18px;padding:1px 5px;margin-left:6px;border-radius:9px;font-size:10px;font-weight:700;background:var(--bd);color:var(--dim)}
+.tbtn.active .badge{background:rgba(0,212,170,.15);color:var(--ac)}
+.badge-unack{background:rgba(255,71,87,.15);color:var(--red)}
+.toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--sf);border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.finput{flex:1;min-width:120px;padding:6px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:var(--fn);font-size:11px;outline:none}
+.finput:focus{border-color:var(--ac);box-shadow:0 0 0 2px rgba(0,212,170,.15)}
+.finput::placeholder{color:var(--dim)}
+.btn{padding:5px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--dim);font-family:var(--fn);font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--ac);color:var(--ac)}
+.btn.has{border-color:var(--ac);color:var(--ac);background:rgba(0,212,170,.08)}
+.btn.ack-all{border-color:var(--red);color:var(--red)}.btn.ack-all:hover{background:rgba(255,71,87,.1)}
+.btn.show-ack.active{border-color:var(--ac);color:var(--ac);background:rgba(0,212,170,.08)}
+.fcnt{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;font-size:9px;font-weight:800;background:var(--ac);color:var(--bg);margin-left:4px}
+.fpanel{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;background:var(--hbg);border-bottom:0px solid var(--bd)}
+.fpanel.open{max-height:500px;padding:12px 14px;border-bottom-width:1px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.fgrp{display:flex;flex-direction:column;gap:5px}
+.flbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+.fdate{padding:6px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:var(--fn);font-size:11px;outline:none;-webkit-appearance:none}
+.fdate:focus{border-color:var(--ac)}.fdate::-webkit-calendar-picker-indicator{filter:invert(.7)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--sf);color:var(--dim);transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--dim)}.chip.sel{border-color:var(--ac);color:var(--ac);background:rgba(0,212,170,.1)}
+.chip.c01.sel{border-color:var(--red);color:var(--red);background:rgba(255,71,87,.1)}
+.chip.c02.sel{border-color:var(--amb);color:var(--amb);background:rgba(255,165,2,.1)}
+.chip.c03.sel{border-color:var(--blu);color:var(--blu);background:rgba(59,130,246,.1)}
+.factions{display:flex;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)}
+.fclr{padding:4px 12px;border:1px solid var(--bd);border-radius:6px;background:none;color:var(--dim);font-family:var(--fn);font-size:10px;cursor:pointer}.fclr:hover{border-color:var(--red);color:var(--red)}
+.drow{display:flex;align-items:center;gap:6px}.drow span{font-size:10px;color:var(--dim);font-weight:600}
+.prow{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.pbtn{padding:2px 8px;border:1px solid var(--bd);border-radius:10px;background:none;color:var(--dim);font-family:var(--fn);font-size:9px;cursor:pointer}.pbtn:hover,.pbtn.active{border-color:var(--ac);color:var(--ac)}
+.tscroll{overflow-x:auto;overflow-y:auto;max-height:520px}
+table{width:100%;border-collapse:collapse}thead{position:sticky;top:0;z-index:2}
+thead th{padding:8px 10px;background:var(--hbg);border-bottom:2px solid var(--bd);text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--ac)}thead th .sa{margin-left:3px;font-size:9px;opacity:.5}thead th.sorted{color:var(--ac)}thead th.sorted .sa{opacity:1}
+tbody tr{border-bottom:1px solid var(--bd);transition:background .1s}tbody tr:hover{background:var(--hov)}
+tbody tr.acked{opacity:.45}
+td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-size:11.5px}
+.clb{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
+.c01{background:rgba(255,71,87,.15);color:var(--red)}.c02{background:rgba(255,165,2,.15);color:var(--amb)}.c03{background:rgba(59,130,246,.15);color:var(--blu)}.cdf{background:rgba(200,214,224,.1);color:var(--dim)}
+.catb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(0,212,170,.1);color:var(--ac);border:1px solid rgba(0,212,170,.25)}
+.tsd{color:var(--dim)}.tst{color:var(--tx);font-weight:600}
+.ack-btn{padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:rgba(255,71,87,.08);color:var(--red);font-family:var(--fn);font-size:9px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px}
+.ack-btn:hover{background:rgba(255,71,87,.2)}
+.ack-done{font-size:10px;color:var(--ac);font-weight:600}
+.empty{padding:48px 16px;text-align:center;color:var(--dim)}.empty .icon{font-size:32px;margin-bottom:8px}.empty .msg{font-size:13px}
+.foot{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sf);border-top:1px solid var(--bd);font-size:10px;color:var(--dim)}
+.ftags{display:flex;gap:6px;flex-wrap:wrap}
+.ftag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:rgba(0,212,170,.1);color:var(--ac);border:1px solid rgba(0,212,170,.2)}
+.ftag .x{cursor:pointer;font-weight:800;margin-left:2px;opacity:.6}.ftag .x:hover{opacity:1}`;
+
+this.shadowRoot.innerHTML=`<style>${S}</style>
+<div class="wrap">
+<div class="hbar"><div class="htitle"><span class="dot"></span>${this._c.title}</div><div class="hmeta" id="meta"></div></div>
+<div class="tbar" id="tabs"></div>
+<div class="toolbar" id="toolbar">
+<input class="finput" id="filter" placeholder="Search all columns…"/>
+<button class="btn" id="filterToggle">⚙ Filters</button>
+<span id="ackBtns"></span>
+<button class="btn" id="refreshBtn">↻</button>
+<button class="btn" id="dlBtn">↓ CSV</button>
+</div>
+<div class="fpanel" id="fp"></div>
+<div class="tscroll"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+<div class="foot"><div style="display:flex;align-items:center;gap:10px"><span id="rc"></span><div class="ftags" id="ftags"></div></div><span>HASS Console v${VER}</span></div>
+</div>`;
+
+this.shadowRoot.getElementById("filter").addEventListener("input",e=>{this._fText=e.target.value;this._update()});
+this.shadowRoot.getElementById("refreshBtn").addEventListener("click",()=>this._fetch());
+this.shadowRoot.getElementById("dlBtn").addEventListener("click",()=>{window.open(this._tab==="ALARM"?this._c.alarm_csv:this._c.log_csv,"_blank")});
+this.shadowRoot.getElementById("filterToggle").addEventListener("click",()=>{this._filtersOpen=!this._filtersOpen;this._updatePanel()});
+this._renderTabs()}
+
+// ── Tabs ──
+_renderTabs(){const c=this.shadowRoot.getElementById("tabs");const unack=this._unackCount();
+c.innerHTML=`<button class="tbtn ${this._tab==="ALARM"?"active":""}" data-t="ALARM">Alarm <span class="badge badge-unack">${unack}</span></button>
+<button class="tbtn ${this._tab==="LOG"?"active":""}" data-t="LOG">Log <span class="badge">${this._log.length}</span></button>`;
+c.querySelectorAll(".tbtn").forEach(b=>b.addEventListener("click",()=>{
+this._tab=b.dataset.t;this._sortCol=null;this._sortDir="desc";this._fClass.clear();this._fCat.clear();this._fEnt.clear();
+this._renderTabs();this._updatePanel();this._update()}))}
+
+// ── Ack buttons in toolbar ──
+_renderAckBtns(){const el=this.shadowRoot.getElementById("ackBtns");
+if(this._tab!=="ALARM"){el.innerHTML="";return}
+const unack=this._unackCount();
+let html=`<button class="btn show-ack ${this._showAck?"active":""}" id="toggleAck">${this._showAck?"Hide":"Show"} ACK'd</button>`;
+if(unack>0)html+=` <button class="btn ack-all" id="ackAllBtn">ACK All (${unack})</button>`;
+el.innerHTML=html;
+el.querySelector("#toggleAck")?.addEventListener("click",()=>{this._showAck=!this._showAck;this._update()});
+el.querySelector("#ackAllBtn")?.addEventListener("click",()=>this._ackAll())}
+
+// ── Filter Panel ──
+_updatePanel(){const p=this.shadowRoot.getElementById("fp");const t=this.shadowRoot.getElementById("filterToggle");const n=this._cntFilters();
+p.classList.toggle("open",this._filtersOpen);t.className=`btn${n>0?" has":""}`;t.innerHTML=`⚙ Filters${n>0?`<span class="fcnt">${n}</span>`:""}`;
+if(!this._filtersOpen){p.innerHTML="";return}
+const cls=this._distClasses(),cats=this._distCats(),ents=this._distEnts();
+const today=new Date(),fmt=d=>d.toISOString().slice(0,10);
+const presets=[{l:"Today",f:fmt(today),t:fmt(today)},{l:"7d",f:fmt(new Date(today-7*864e5)),t:fmt(today)},{l:"30d",f:fmt(new Date(today-30*864e5)),t:fmt(today)},{l:"Month",f:fmt(new Date(today.getFullYear(),today.getMonth(),1)),t:fmt(today)}];
+
+let clsH="";if(this._tab==="ALARM"&&cls.length){clsH=`<div class="fgrp"><div class="flbl">Alarm Class</div><div class="chips" id="clsC">${cls.map(c=>{
+const s=this._fClass.has(c)?"sel":"";const cc=c==="01"?"c01":c==="02"?"c02":c==="03"?"c03":"";
+const l=c==="01"?"01 Crit":c==="02"?"02 Major":c==="03"?"03 Minor":c;
+return`<span class="chip ${cc} ${s}" data-v="${c}">${l}</span>`}).join("")}</div></div>`}
+let catH="";if(cats.length){catH=`<div class="fgrp"><div class="flbl">Category</div><div class="chips" id="catC">${cats.map(c=>`<span class="chip ${this._fCat.has(c)?"sel":""}" data-v="${c}">${c}</span>`).join("")}</div></div>`}
+let entH="";if(ents.length){entH=`<div class="fgrp"><div class="flbl">Entity</div><div class="chips" id="entC">${ents.map(e=>`<span class="chip ${this._fEnt.has(e)?"sel":""}" data-v="${e}">${e.replace("hass_console.","")}</span>`).join("")}</div></div>`}
+const pbtns=presets.map(pr=>`<button class="pbtn ${this._fFrom===pr.f&&this._fTo===pr.t?"active":""}" data-f="${pr.f}" data-t="${pr.t}">${pr.l}</button>`).join("");
+
+p.innerHTML=`<div class="fgrid">${clsH}${catH}${entH}<div class="fgrp"><div class="flbl">Date Range</div><div class="drow"><input type="date" class="fdate" id="df" value="${this._fFrom}"/><span>→</span><input type="date" class="fdate" id="dt" value="${this._fTo}"/></div><div class="prow">${pbtns}</div></div></div><div class="factions"><button class="fclr" id="fclr">✕ Clear All</button></div>`;
+
+const wire=(sel,set)=>{p.querySelectorAll(sel).forEach(ch=>ch.addEventListener("click",()=>{const v=ch.dataset.v;if(set.has(v))set.delete(v);else set.add(v);this._updatePanel();this._update()}))};
+wire("#clsC .chip",this._fClass);wire("#catC .chip",this._fCat);wire("#entC .chip",this._fEnt);
+p.querySelector("#df")?.addEventListener("change",e=>{this._fFrom=e.target.value;this._updatePanel();this._update()});
+p.querySelector("#dt")?.addEventListener("change",e=>{this._fTo=e.target.value;this._updatePanel();this._update()});
+p.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{this._fFrom=b.dataset.f;this._fTo=b.dataset.t;this._updatePanel();this._update()}));
+p.querySelector("#fclr")?.addEventListener("click",()=>this._clearFilters())}
+
+// ── Footer tags ──
+_renderFoot(){const el=this.shadowRoot.getElementById("ftags");if(!el)return;const tags=[];
+if(this._fClass.size)tags.push({l:`Class: ${[...this._fClass]}`,c:()=>this._fClass.clear()});
+if(this._fCat.size)tags.push({l:`Cat: ${[...this._fCat]}`,c:()=>this._fCat.clear()});
+if(this._fEnt.size)tags.push({l:`Ent: ${[...this._fEnt].map(e=>e.replace("hass_console.",""))}`,c:()=>this._fEnt.clear()});
+if(this._fFrom||this._fTo)tags.push({l:`Date: ${this._fFrom||"…"}→${this._fTo||"…"}`,c:()=>{this._fFrom="";this._fTo=""}});
+el.innerHTML=tags.map((t,i)=>`<span class="ftag">${t.l}<span class="x" data-i="${i}">✕</span></span>`).join("");
+el.querySelectorAll(".x").forEach(x=>x.addEventListener("click",()=>{tags[parseInt(x.dataset.i)]?.c();this._updatePanel();this._update()}))}
+
+// ── Columns ──
+_cols(){
+if(this._tab==="ALARM"){const cols=[{k:"timestamp",l:"Timestamp"},{k:"category",l:"Category"},{k:"entity",l:"Entity"},{k:"class",l:"Class"},
+{k:"value",l:"Value"},{k:"duration",l:"Duration"},{k:"note",l:"Note"},{k:"trigger",l:"Trigger"},{k:"_ack",l:""}];return cols}
+return[{k:"timestamp",l:"Timestamp"},{k:"category",l:"Category"},{k:"entity",l:"Entity"},{k:"value",l:"Value"},{k:"note",l:"Note"}]}
+
+// ── Table update ──
+_update(){this._renderTabs();this._renderAckBtns();this._renderFoot();
+const cols=this._cols(),rows=this._rows();
+const thead=this.shadowRoot.getElementById("thead");
+thead.innerHTML=`<tr>${cols.map(c=>{if(c.k==="_ack")return`<th style="width:70px"></th>`;
+const s=this._sortCol===c.k;const a=s?(this._sortDir==="asc"?"▲":"▼"):"⇅";
+return`<th class="${s?"sorted":""}" data-c="${c.k}">${c.l}<span class="sa">${a}</span></th>`}).join("")}</tr>`;
+thead.querySelectorAll("th[data-c]").forEach(th=>th.addEventListener("click",()=>{
+const c=th.dataset.c;if(this._sortCol===c)this._sortDir=this._sortDir==="asc"?"desc":"asc";else{this._sortCol=c;this._sortDir="asc"}this._update()}));
+
+const tbody=this.shadowRoot.getElementById("tbody");
+if(!rows.length){const hasF=this._cntFilters()>0||this._fText;const icon=hasF?"🔍":this._tab==="ALARM"?"🔔":"📋";
+const msg=hasF?"No entries match current filters":this._tab==="ALARM"&&!this._showAck?"No unacknowledged alarms":`No ${this._tab.toLowerCase()} entries yet`;
+tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class="icon">${icon}</div><div class="msg">${msg}</div></div></td></tr>`}
+else{tbody.innerHTML=rows.map(r=>{
+const isAcked=!!(r.ack);const trCls=isAcked?"acked":"";
+return`<tr class="${trCls}">${cols.map(c=>{
+if(c.k==="_ack"){if(isAcked)return`<td><span class="ack-done">✓ ${this._esc(r.ack)}</span></td>`;
+return`<td><button class="ack-btn" data-id="${this._esc(r.id||"")}">ACK</button></td>`}
+return`<td>${this._fmtCell(c.k,r[c.k]||"")}</td>`}).join("")}</tr>`}).join("")}
+
+// Wire ACK buttons
+tbody.querySelectorAll(".ack-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();this._ack(b.dataset.id)}));
+
+const total=this._data().length;const showing=rows.length;
+const filteredNote=this._tab==="ALARM"&&!this._showAck?` (${this._alarm.length-this._unackCount()} ack'd hidden)`:"";
+this.shadowRoot.getElementById("rc").textContent=total!==showing?`${showing} of ${total} rows${filteredNote}`:`${showing} rows${filteredNote}`;
+this.shadowRoot.getElementById("meta").textContent=`Refreshed ${new Date().toLocaleTimeString()}`}
+
+_fmtCell(k,v){
+if(k==="timestamp"&&v){const p=v.split(' ');if(p.length===2&&/^\d{4}-\d{2}-\d{2}$/.test(p[0]))return`<span class="tsd">${this._esc(p[0])}</span> <span class="tst">${this._esc(p[1])}</span>`;
+const d=parseTS(v);if(d){return`<span class="tsd">${d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"})}</span> <span class="tst">${d.toLocaleTimeString("en-US",{hour12:false})}</span>`}return this._esc(v)}
+if(k==="class"&&v){const c=v==="01"?"c01":v==="02"?"c02":v==="03"?"c03":"cdf";return`<span class="clb ${c}">${this._esc(v)}</span>`}
+if(k==="category"&&v)return`<span class="catb">${this._esc(v)}</span>`;
+if(k==="entity"&&v)return this._esc(v.replace("hass_console.",""));
+return this._esc(v)}
+
+_esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+getCardSize(){return 8}
+disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
+static getStubConfig(){return{title:"HASS Console",alarm_csv:"/local/hass-console-alarms.csv",log_csv:"/local/hass-console-logs.csv",rows:200,refresh_interval:30}}
 }
 
-class HassConsoleCard extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this._config = {};
-    this._alarmData = [];
-    this._logData = [];
-    this._activeTab = "ALARM";
-    this._refreshTimer = null;
-    this._sortCol = null;
-    this._sortDir = "desc";
-    this._filterText = "";
-    this._filterClasses = new Set();
-    this._filterCategories = new Set();
-    this._filterEntities = new Set();
-    this._filterDateFrom = "";
-    this._filterDateTo = "";
-    this._filtersOpen = false;
-    this._activeFilterCount = 0;
-  }
-
-  setConfig(config) {
-    this._config = {
-      title: config.title || "HASS Console",
-      alarm_csv: config.alarm_csv || "/local/hass-console-alarms.csv",
-      log_csv: config.log_csv || "/local/hass-console-logs.csv",
-      rows: config.rows || 200,
-      refresh_interval: config.refresh_interval || 30,
-    };
-  }
-
-  set hass(hass) {
-    this._hass = hass;
-    if (!this._initialized) {
-      this._initialized = true;
-      this._render();
-      this._fetchCSVs();
-      this._startAutoRefresh();
-    }
-  }
-
-  _startAutoRefresh() {
-    if (this._refreshTimer) clearInterval(this._refreshTimer);
-    this._refreshTimer = setInterval(() => this._fetchCSVs(), this._config.refresh_interval * 1000);
-  }
-
-  async _fetchCSVs() {
-    await Promise.all([this._fetchCSV("alarm"), this._fetchCSV("log")]);
-    this._updateTable();
-  }
-
-  async _fetchCSV(type) {
-    try {
-      const url = type === "alarm" ? this._config.alarm_csv : this._config.log_csv;
-      const resp = await fetch(url + `?_=${Date.now()}`);
-      if (!resp.ok) { if (type === "alarm") this._alarmData = []; else this._logData = []; return; }
-      const text = await resp.text();
-      const rows = this._parseCSV(text);
-      if (type === "alarm") this._alarmData = rows; else this._logData = rows;
-    } catch (e) {
-      console.error(`HASS Console: ${type} CSV fetch error:`, e);
-    }
-  }
-
-  _parseCSV(text) {
-    const lines = text.trim().split("\n");
-    if (lines.length < 2) return [];
-    const headers = this._splitCSVLine(lines[0]);
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = this._splitCSVLine(lines[i]);
-      if (cols.length < headers.length) continue;
-      const row = {};
-      headers.forEach((h, idx) => (row[h.trim()] = cols[idx]?.trim() || ""));
-      rows.push(row);
-    }
-    return rows;
-  }
-
-  _splitCSVLine(line) {
-    const result = []; let current = ""; let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') inQuotes = !inQuotes;
-      else if (ch === "," && !inQuotes) { result.push(current); current = ""; }
-      else current += ch;
-    }
-    result.push(current);
-    return result;
-  }
-
-  _getData() { return this._activeTab === "ALARM" ? this._alarmData : this._logData; }
-
-  _getDistinctClasses() {
-    const s = new Set();
-    this._alarmData.forEach(r => { if (r.class) s.add(r.class); });
-    return [...s].sort();
-  }
-  _getDistinctCategories() {
-    const s = new Set();
-    this._getData().forEach(r => { if (r.category) s.add(r.category); });
-    return [...s].sort();
-  }
-  _getDistinctEntities() {
-    const s = new Set();
-    this._getData().forEach(r => { if (r.entity) s.add(r.entity); });
-    return [...s].sort();
-  }
-
-  _getRows() {
-    let rows = [...this._getData()];
-
-    if (this._filterText) {
-      const ft = this._filterText.toLowerCase();
-      rows = rows.filter(r => Object.values(r).some(v => v.toLowerCase().includes(ft)));
-    }
-    if (this._filterClasses.size > 0 && this._activeTab === "ALARM") {
-      rows = rows.filter(r => this._filterClasses.has(r.class || ""));
-    }
-    if (this._filterCategories.size > 0) {
-      rows = rows.filter(r => this._filterCategories.has(r.category || ""));
-    }
-    if (this._filterEntities.size > 0) {
-      rows = rows.filter(r => this._filterEntities.has(r.entity || ""));
-    }
-    if (this._filterDateFrom) {
-      const from = new Date(this._filterDateFrom + "T00:00:00");
-      rows = rows.filter(r => { const d = parseTimestamp(r.timestamp); return d ? d >= from : true; });
-    }
-    if (this._filterDateTo) {
-      const to = new Date(this._filterDateTo + "T23:59:59");
-      rows = rows.filter(r => { const d = parseTimestamp(r.timestamp); return d ? d <= to : true; });
-    }
-
-    if (this._sortCol) {
-      rows.sort((a, b) => {
-        const va = a[this._sortCol] || ""; const vb = b[this._sortCol] || "";
-        const cmp = va.localeCompare(vb, undefined, { numeric: true });
-        return this._sortDir === "asc" ? cmp : -cmp;
-      });
-    } else { rows.reverse(); }
-    return rows.slice(0, this._config.rows);
-  }
-
-  _countActiveFilters() {
-    let n = 0;
-    if (this._filterClasses.size > 0) n++;
-    if (this._filterCategories.size > 0) n++;
-    if (this._filterEntities.size > 0) n++;
-    if (this._filterDateFrom) n++;
-    if (this._filterDateTo) n++;
-    this._activeFilterCount = n;
-    return n;
-  }
-
-  _clearAllFilters() {
-    this._filterClasses.clear(); this._filterCategories.clear(); this._filterEntities.clear();
-    this._filterDateFrom = ""; this._filterDateTo = ""; this._filterText = "";
-    const fi = this.shadowRoot.getElementById("filter");
-    if (fi) fi.value = "";
-    this._updateFilterPanel(); this._updateTable();
-  }
-
-  _render() {
-    const style = `
-      :host {
-        --con-bg: #0c1117; --con-surface: #141b24; --con-border: #1e2a36;
-        --con-text: #c8d6e0; --con-text-dim: #6b7f8e; --con-accent: #00d4aa;
-        --con-alarm-red: #ff4757; --con-alarm-amber: #ffa502; --con-alarm-blue: #3b82f6;
-        --con-tab-active: #00d4aa; --con-row-hover: rgba(0,212,170,0.06);
-        --con-header-bg: #0f1820;
-        --con-font: "SF Mono","Cascadia Code","JetBrains Mono","Fira Code",monospace;
-      }
-      *{box-sizing:border-box;margin:0;padding:0}
-      .console-wrap{background:var(--con-bg);border:1px solid var(--con-border);border-radius:12px;overflow:hidden;font-family:var(--con-font);font-size:12px;color:var(--con-text)}
-      .header-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--con-surface);border-bottom:1px solid var(--con-border)}
-      .header-title{font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--con-accent);display:flex;align-items:center;gap:8px}
-      .header-title .dot{width:8px;height:8px;border-radius:50%;background:var(--con-accent);animation:pulse 2s infinite}
-      @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-      .header-meta{font-size:11px;color:var(--con-text-dim)}
-      .tab-bar{display:flex;background:var(--con-header-bg);border-bottom:2px solid var(--con-border)}
-      .tab-btn{flex:1;padding:10px 0;text-align:center;font-family:var(--con-font);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--con-text-dim);background:none;border:none;cursor:pointer;position:relative;transition:color .2s}
-      .tab-btn:hover{color:var(--con-text)}
-      .tab-btn.active{color:var(--con-tab-active)}
-      .tab-btn.active::after{content:"";position:absolute;bottom:-2px;left:10%;width:80%;height:2px;background:var(--con-tab-active);border-radius:1px}
-      .tab-btn .badge{display:inline-block;min-width:18px;padding:1px 5px;margin-left:6px;border-radius:9px;font-size:10px;font-weight:700;background:var(--con-border);color:var(--con-text-dim)}
-      .tab-btn.active .badge{background:rgba(0,212,170,.15);color:var(--con-accent)}
-      .toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--con-surface);border-bottom:1px solid var(--con-border)}
-      .filter-input{flex:1;padding:6px 10px;border:1px solid var(--con-border);border-radius:6px;background:var(--con-bg);color:var(--con-text);font-family:var(--con-font);font-size:11px;outline:none}
-      .filter-input:focus{border-color:var(--con-accent);box-shadow:0 0 0 2px rgba(0,212,170,.15)}
-      .filter-input::placeholder{color:var(--con-text-dim)}
-      .toolbar-btn{padding:5px 10px;border:1px solid var(--con-border);border-radius:6px;background:var(--con-surface);color:var(--con-text-dim);font-family:var(--con-font);font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap}
-      .toolbar-btn:hover{border-color:var(--con-accent);color:var(--con-accent)}
-      .toolbar-btn.has-filters{border-color:var(--con-accent);color:var(--con-accent);background:rgba(0,212,170,.08)}
-      .filter-count{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;font-size:9px;font-weight:800;background:var(--con-accent);color:var(--con-bg);margin-left:4px}
-      .filter-panel{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;background:var(--con-header-bg);border-bottom:0px solid var(--con-border)}
-      .filter-panel.open{max-height:500px;padding:12px 14px;border-bottom-width:1px}
-      .filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-      .filter-group{display:flex;flex-direction:column;gap:5px}
-      .filter-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--con-text-dim)}
-      .filter-date{padding:6px 8px;border:1px solid var(--con-border);border-radius:6px;background:var(--con-bg);color:var(--con-text);font-family:var(--con-font);font-size:11px;outline:none;-webkit-appearance:none;appearance:none}
-      .filter-date:focus{border-color:var(--con-accent);box-shadow:0 0 0 2px rgba(0,212,170,.15)}
-      .filter-date::-webkit-calendar-picker-indicator{filter:invert(.7)}
-      .chip-container{display:flex;flex-wrap:wrap;gap:4px}
-      .chip{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--con-border);background:var(--con-surface);color:var(--con-text-dim);transition:all .15s;user-select:none}
-      .chip:hover{border-color:var(--con-text-dim)}
-      .chip.selected{border-color:var(--con-accent);color:var(--con-accent);background:rgba(0,212,170,.1)}
-      .chip.class-01.selected{border-color:var(--con-alarm-red);color:var(--con-alarm-red);background:rgba(255,71,87,.1)}
-      .chip.class-02.selected{border-color:var(--con-alarm-amber);color:var(--con-alarm-amber);background:rgba(255,165,2,.1)}
-      .chip.class-03.selected{border-color:var(--con-alarm-blue);color:var(--con-alarm-blue);background:rgba(59,130,246,.1)}
-      .filter-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--con-border)}
-      .filter-clear-btn{padding:4px 12px;border:1px solid var(--con-border);border-radius:6px;background:none;color:var(--con-text-dim);font-family:var(--con-font);font-size:10px;cursor:pointer;transition:all .15s}
-      .filter-clear-btn:hover{border-color:var(--con-alarm-red);color:var(--con-alarm-red)}
-      .date-range-row{display:flex;align-items:center;gap:6px}
-      .date-range-row span{font-size:10px;color:var(--con-text-dim);font-weight:600}
-      .preset-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-      .preset-btn{padding:2px 8px;border:1px solid var(--con-border);border-radius:10px;background:none;color:var(--con-text-dim);font-family:var(--con-font);font-size:9px;cursor:pointer;transition:all .12s}
-      .preset-btn:hover{border-color:var(--con-accent);color:var(--con-accent)}
-      .preset-btn.active{border-color:var(--con-accent);color:var(--con-accent);background:rgba(0,212,170,.08)}
-      .table-scroll{overflow-x:auto;overflow-y:auto;max-height:520px}
-      table{width:100%;border-collapse:collapse;table-layout:auto}
-      thead{position:sticky;top:0;z-index:2}
-      thead th{padding:8px 10px;background:var(--con-header-bg);border-bottom:2px solid var(--con-border);text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--con-text-dim);white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
-      thead th:hover{color:var(--con-accent)}
-      thead th .sort-arrow{margin-left:3px;font-size:9px;opacity:.5}
-      thead th.sorted{color:var(--con-accent)}
-      thead th.sorted .sort-arrow{opacity:1}
-      tbody tr{border-bottom:1px solid var(--con-border);transition:background .1s}
-      tbody tr:hover{background:var(--con-row-hover)}
-      td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-size:11.5px}
-      .class-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
-      .class-01{background:rgba(255,71,87,.15);color:var(--con-alarm-red)}
-      .class-02{background:rgba(255,165,2,.15);color:var(--con-alarm-amber)}
-      .class-03{background:rgba(59,130,246,.15);color:var(--con-alarm-blue)}
-      .class-default{background:rgba(200,214,224,.1);color:var(--con-text-dim)}
-      .category-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.3px;background:rgba(0,212,170,.1);color:var(--con-accent);border:1px solid rgba(0,212,170,.25)}
-      .ts-date{color:var(--con-text-dim)}.ts-time{color:var(--con-text);font-weight:600}
-      .empty-state{padding:48px 16px;text-align:center;color:var(--con-text-dim)}
-      .empty-state .icon{font-size:32px;margin-bottom:8px}
-      .empty-state .msg{font-size:13px}
-      .footer{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--con-surface);border-top:1px solid var(--con-border);font-size:10px;color:var(--con-text-dim)}
-      .footer-filters{display:flex;gap:6px;flex-wrap:wrap}
-      .active-filter-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:rgba(0,212,170,.1);color:var(--con-accent);border:1px solid rgba(0,212,170,.2)}
-      .active-filter-tag .x{cursor:pointer;font-weight:800;margin-left:2px;opacity:.6;transition:opacity .1s}
-      .active-filter-tag .x:hover{opacity:1}
-    `;
-
-    this.shadowRoot.innerHTML = `
-      <style>${style}</style>
-      <div class="console-wrap">
-        <div class="header-bar">
-          <div class="header-title"><span class="dot"></span>${this._config.title}</div>
-          <div class="header-meta" id="meta"></div>
-        </div>
-        <div class="tab-bar" id="tabs"></div>
-        <div class="toolbar">
-          <input class="filter-input" id="filter" placeholder="Search all columns…" />
-          <button class="toolbar-btn" id="filterToggle">⚙ Filters</button>
-          <button class="toolbar-btn" id="refreshBtn">↻ Refresh</button>
-          <button class="toolbar-btn" id="downloadBtn">↓ CSV</button>
-        </div>
-        <div class="filter-panel" id="filterPanel"></div>
-        <div class="table-scroll"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
-        <div class="footer">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span id="rowcount"></span>
-            <div class="footer-filters" id="footerFilters"></div>
-          </div>
-          <span>HASS Console v${CARD_VERSION}</span>
-        </div>
-      </div>`;
-
-    this.shadowRoot.getElementById("filter").addEventListener("input", e => { this._filterText = e.target.value; this._updateTable(); });
-    this.shadowRoot.getElementById("refreshBtn").addEventListener("click", () => this._fetchCSVs());
-    this.shadowRoot.getElementById("downloadBtn").addEventListener("click", () => {
-      const url = this._activeTab === "ALARM" ? this._config.alarm_csv : this._config.log_csv;
-      window.open(url, "_blank");
-    });
-    this.shadowRoot.getElementById("filterToggle").addEventListener("click", () => {
-      this._filtersOpen = !this._filtersOpen; this._updateFilterPanel();
-    });
-    this._renderTabs();
-  }
-
-  _renderTabs() {
-    const c = this.shadowRoot.getElementById("tabs");
-    c.innerHTML = `
-      <button class="tab-btn ${this._activeTab==="ALARM"?"active":""}" data-tab="ALARM">Alarm <span class="badge">${this._alarmData.length}</span></button>
-      <button class="tab-btn ${this._activeTab==="LOG"?"active":""}" data-tab="LOG">Log <span class="badge">${this._logData.length}</span></button>`;
-    c.querySelectorAll(".tab-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        this._activeTab = btn.dataset.tab;
-        this._sortCol = null; this._sortDir = "desc";
-        this._filterClasses.clear(); this._filterCategories.clear(); this._filterEntities.clear();
-        this._renderTabs(); this._updateFilterPanel(); this._updateTable();
-      });
-    });
-  }
-
-  _updateFilterPanel() {
-    const panel = this.shadowRoot.getElementById("filterPanel");
-    const toggle = this.shadowRoot.getElementById("filterToggle");
-    const n = this._countActiveFilters();
-    panel.classList.toggle("open", this._filtersOpen);
-    toggle.className = `toolbar-btn${n>0?" has-filters":""}`;
-    toggle.innerHTML = `⚙ Filters${n>0?`<span class="filter-count">${n}</span>`:""}`;
-    if (!this._filtersOpen) { panel.innerHTML = ""; return; }
-
-    const classes = this._getDistinctClasses();
-    const categories = this._getDistinctCategories();
-    const entities = this._getDistinctEntities();
-    const today = new Date(); const fmt = d => d.toISOString().slice(0,10);
-    const presets = [
-      {label:"Today",from:fmt(today),to:fmt(today)},
-      {label:"Last 7d",from:fmt(new Date(today-7*864e5)),to:fmt(today)},
-      {label:"Last 30d",from:fmt(new Date(today-30*864e5)),to:fmt(today)},
-      {label:"This Month",from:fmt(new Date(today.getFullYear(),today.getMonth(),1)),to:fmt(today)},
-    ];
-
-    let classSection = "";
-    if (this._activeTab === "ALARM" && classes.length > 0) {
-      const chips = classes.map(c => {
-        const sel = this._filterClasses.has(c)?"selected":"";
-        const cc = c==="01"?"class-01":c==="02"?"class-02":c==="03"?"class-03":"";
-        const label = c==="01"?"01 Critical":c==="02"?"02 Major":c==="03"?"03 Minor":c;
-        return `<span class="chip ${cc} ${sel}" data-class="${c}">${label}</span>`;
-      }).join("");
-      classSection = `<div class="filter-group"><div class="filter-label">Alarm Class</div><div class="chip-container" id="classChips">${chips}</div></div>`;
-    }
-
-    let categorySection = "";
-    if (categories.length > 0) {
-      const chips = categories.map(c => {
-        const sel = this._filterCategories.has(c)?"selected":"";
-        return `<span class="chip ${sel}" data-category="${c}">${c}</span>`;
-      }).join("");
-      categorySection = `<div class="filter-group"><div class="filter-label">Category</div><div class="chip-container" id="categoryChips">${chips}</div></div>`;
-    }
-
-    let entitySection = "";
-    if (entities.length > 0) {
-      const opts = entities.map(e => {
-        const sel = this._filterEntities.has(e)?"selected":"";
-        return `<span class="chip ${sel}" data-entity="${e}">${e.replace("hass_console.","")}</span>`;
-      }).join("");
-      entitySection = `<div class="filter-group"><div class="filter-label">Entity</div><div class="chip-container" id="entityChips">${opts}</div></div>`;
-    }
-
-    const presetBtns = presets.map(p => {
-      const active = (this._filterDateFrom===p.from&&this._filterDateTo===p.to)?"active":"";
-      return `<button class="preset-btn ${active}" data-pfrom="${p.from}" data-pto="${p.to}">${p.label}</button>`;
-    }).join("");
-
-    panel.innerHTML = `
-      <div class="filter-grid">
-        ${classSection}${categorySection}${entitySection}
-        <div class="filter-group">
-          <div class="filter-label">Date Range</div>
-          <div class="date-range-row">
-            <input type="date" class="filter-date" id="dateFrom" value="${this._filterDateFrom}" />
-            <span>→</span>
-            <input type="date" class="filter-date" id="dateTo" value="${this._filterDateTo}" />
-          </div>
-          <div class="preset-row">${presetBtns}</div>
-        </div>
-      </div>
-      <div class="filter-actions"><button class="filter-clear-btn" id="clearAllFilters">✕ Clear All Filters</button></div>`;
-
-    panel.querySelectorAll("#classChips .chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        const v = chip.dataset.class;
-        if (this._filterClasses.has(v)) this._filterClasses.delete(v); else this._filterClasses.add(v);
-        this._updateFilterPanel(); this._updateTable();
-      });
-    });
-    panel.querySelectorAll("#categoryChips .chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        const v = chip.dataset.category;
-        if (this._filterCategories.has(v)) this._filterCategories.delete(v); else this._filterCategories.add(v);
-        this._updateFilterPanel(); this._updateTable();
-      });
-    });
-    panel.querySelectorAll("#entityChips .chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        const v = chip.dataset.entity;
-        if (this._filterEntities.has(v)) this._filterEntities.delete(v); else this._filterEntities.add(v);
-        this._updateFilterPanel(); this._updateTable();
-      });
-    });
-    const df = panel.querySelector("#dateFrom"), dt = panel.querySelector("#dateTo");
-    if (df) df.addEventListener("change", e => { this._filterDateFrom = e.target.value; this._updateFilterPanel(); this._updateTable(); });
-    if (dt) dt.addEventListener("change", e => { this._filterDateTo = e.target.value; this._updateFilterPanel(); this._updateTable(); });
-    panel.querySelectorAll(".preset-btn").forEach(btn => {
-      btn.addEventListener("click", () => { this._filterDateFrom=btn.dataset.pfrom; this._filterDateTo=btn.dataset.pto; this._updateFilterPanel(); this._updateTable(); });
-    });
-    panel.querySelector("#clearAllFilters").addEventListener("click", () => this._clearAllFilters());
-  }
-
-  _renderFooterFilters() {
-    const el = this.shadowRoot.getElementById("footerFilters"); if (!el) return;
-    const tags = [];
-    if (this._filterClasses.size>0) tags.push({label:`Class: ${[...this._filterClasses].join(", ")}`,clear:()=>{this._filterClasses.clear()}});
-    if (this._filterCategories.size>0) tags.push({label:`Category: ${[...this._filterCategories].join(", ")}`,clear:()=>{this._filterCategories.clear()}});
-    if (this._filterEntities.size>0) tags.push({label:`Entity: ${[...this._filterEntities].map(e=>e.replace("hass_console.","")).join(", ")}`,clear:()=>{this._filterEntities.clear()}});
-    if (this._filterDateFrom||this._filterDateTo) tags.push({label:`Date: ${this._filterDateFrom||"…"} → ${this._filterDateTo||"…"}`,clear:()=>{this._filterDateFrom="";this._filterDateTo=""}});
-    el.innerHTML = tags.map((t,i)=>`<span class="active-filter-tag">${t.label}<span class="x" data-idx="${i}">✕</span></span>`).join("");
-    el.querySelectorAll(".x").forEach(x => {
-      x.addEventListener("click", () => { const i=parseInt(x.dataset.idx); if(tags[i]){tags[i].clear();this._updateFilterPanel();this._updateTable()} });
-    });
-  }
-
-  _getColumns() {
-    if (this._activeTab === "ALARM") return [
-      {key:"timestamp",label:"Timestamp"},{key:"category",label:"Category"},
-      {key:"entity",label:"Entity"},{key:"class",label:"Class"},
-      {key:"value",label:"Value"},{key:"duration",label:"Duration"},
-      {key:"note",label:"Note"},{key:"trigger",label:"Trigger"},
-    ];
-    return [
-      {key:"timestamp",label:"Timestamp"},{key:"category",label:"Category"},
-      {key:"entity",label:"Entity"},{key:"value",label:"Value"},{key:"note",label:"Note"},
-    ];
-  }
-
-  _updateTable() {
-    this._renderTabs(); this._renderFooterFilters();
-    const cols = this._getColumns(); const rows = this._getRows();
-    const thead = this.shadowRoot.getElementById("thead");
-    thead.innerHTML = `<tr>${cols.map(c=>{
-      const sorted=this._sortCol===c.key;
-      const arrow=sorted?(this._sortDir==="asc"?"▲":"▼"):"⇅";
-      return `<th class="${sorted?"sorted":""}" data-col="${c.key}">${c.label}<span class="sort-arrow">${arrow}</span></th>`;
-    }).join("")}</tr>`;
-    thead.querySelectorAll("th").forEach(th=>{
-      th.addEventListener("click",()=>{
-        const col=th.dataset.col;
-        if(this._sortCol===col) this._sortDir=this._sortDir==="asc"?"desc":"asc";
-        else{this._sortCol=col;this._sortDir="asc"}
-        this._updateTable();
-      });
-    });
-    const tbody = this.shadowRoot.getElementById("tbody");
-    if (rows.length===0) {
-      const hasF=this._countActiveFilters()>0||this._filterText;
-      const icon=hasF?"🔍":(this._activeTab==="ALARM"?"🔔":"📋");
-      const msg=hasF?"No entries match current filters":`No ${this._activeTab.toLowerCase()} entries yet`;
-      tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty-state"><div class="icon">${icon}</div><div class="msg">${msg}</div></div></td></tr>`;
-    } else {
-      tbody.innerHTML=rows.map(r=>`<tr>${cols.map(c=>`<td>${this._formatCell(c.key,r[c.key]||"")}</td>`).join("")}</tr>`).join("");
-    }
-    const total=this._getData().length; const showing=rows.length;
-    this.shadowRoot.getElementById("rowcount").textContent=total!==showing?`${showing} of ${total} rows`:`${showing} rows`;
-    this.shadowRoot.getElementById("meta").textContent=`Refreshed ${new Date().toLocaleTimeString()}`;
-  }
-
-  _formatCell(key, val) {
-    if (key==="timestamp"&&val) {
-      // Fast path: engine writes "YYYY-MM-DD HH:MM:SS" with a single space
-      const parts = val.split(' ');
-      if (parts.length===2 && /^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
-        return `<span class="ts-date">${this._escHTML(parts[0])}</span> <span class="ts-time">${this._escHTML(parts[1])}</span>`;
-      }
-      // Fallback: legacy ISO format
-      const d = parseTimestamp(val);
-      if (d) {
-        const date=d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});
-        const time=d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
-        return `<span class="ts-date">${date}</span> <span class="ts-time">${time}</span>`;
-      }
-      return this._escHTML(val);
-    }
-    if (key==="class"&&val) {
-      const cls=val==="01"?"class-01":val==="02"?"class-02":val==="03"?"class-03":"class-default";
-      return `<span class="class-badge ${cls}">${this._escHTML(val)}</span>`;
-    }
-    if (key==="category"&&val) {
-      return `<span class="category-badge">${this._escHTML(val)}</span>`;
-    }
-    if (key==="entity"&&val) return this._escHTML(val.replace("hass_console.",""));
-    return this._escHTML(val);
-  }
-
-  _escHTML(str){const d=document.createElement("div");d.textContent=str;return d.innerHTML}
-  getCardSize(){return 8}
-  disconnectedCallback(){if(this._refreshTimer)clearInterval(this._refreshTimer)}
-  static getStubConfig(){return{title:"HASS Console",alarm_csv:"/local/hass-console-alarms.csv",log_csv:"/local/hass-console-logs.csv",rows:200,refresh_interval:30}}
-}
-
-customElements.define("hass-console-card", HassConsoleCard);
-window.customCards = window.customCards || [];
-window.customCards.push({ type: "hass-console-card", name: "HASS Console Card", description: "Niagara-style Alarm & Log console with filters for Home Assistant" });
+customElements.define("hass-console-card",HassConsoleCard);
+window.customCards=window.customCards||[];
+window.customCards.push({type:"hass-console-card",name:"HASS Console Card",description:"Niagara-style Alarm & Log console for Home Assistant"});
