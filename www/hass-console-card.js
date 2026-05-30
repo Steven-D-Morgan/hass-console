@@ -1,34 +1,42 @@
 /**
- * HASS Console Card v2.3.0
+ * HASS Console Card v2.5.0
  *
  * CONFIG:
  *   type: custom:hass-console-card
  *   title: HASS Console
- *   alarm_csv: /local/hass-console-alarms.csv
- *   log_csv: /local/hass-console-logs.csv
+ *   alarm_csv: /local/hass-console/alarms.csv
+ *   log_csv: /local/hass-console/logs.csv
  *   rows: 200
  *   refresh_interval: 30
+ *   theme: auto          # auto | dark | light
  */
-const VER="2.3.0";
-function parseTS(v){if(!v)return null;const n=v.indexOf(' ')!==-1&&v.indexOf('T')===-1?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
+const VER="2.5.0";
+function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
 constructor(){super();this.attachShadow({mode:"open"});this._c={};this._alarm=[];this._log=[];this._tab="ALARM";this._timer=null;this._sortCol=null;this._sortDir="desc";
-this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false}
+this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto"}
 
-setConfig(c){this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console-alarms.csv",log_csv:c.log_csv||"/local/hass-console-logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30}}
+setConfig(c){this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30};this._theme=c.theme||"auto"}
 
 set hass(h){this._hass=h;if(!this._init){this._init=true;this._render();this._fetch();this._startRefresh()}}
 
-_startRefresh(){if(this._timer)clearInterval(this._timer);this._timer=setInterval(()=>this._fetch(),this._c.refresh*1000)}
+_isDark(){if(this._theme==="dark")return true;if(this._theme==="light")return false;
+// auto: check HA theme
+const bg=getComputedStyle(document.documentElement).getPropertyValue('--primary-background-color').trim();
+if(!bg)return true;
+const m=bg.match(/\d+/g);if(!m||m.length<3)return true;
+const lum=(parseInt(m[0])*299+parseInt(m[1])*587+parseInt(m[2])*114)/1000;
+return lum<128}
 
+_startRefresh(){if(this._timer)clearInterval(this._timer);this._timer=setInterval(()=>this._fetch(),this._c.refresh*1000)}
 async _fetch(){await Promise.all([this._fetchOne("alarm"),this._fetchOne("log")]);this._update()}
 async _fetchOne(t){try{const u=t==="alarm"?this._c.alarm_csv:this._c.log_csv;const r=await fetch(u+`?_=${Date.now()}`);if(!r.ok){if(t==="alarm")this._alarm=[];else this._log=[];return}
-const rows=this._parseCSV(await r.text());if(t==="alarm")this._alarm=rows;else this._log=rows}catch(e){console.error("HASS Console fetch:",e)}}
+const rows=this._parseCSV(await r.text());if(t==="alarm")this._alarm=rows;else this._log=rows}catch(e){console.error("HASS Console:",e)}}
 
-_parseCSV(text){const lines=text.trim().split("\n");if(lines.length<2)return[];const hdr=this._splitLine(lines[0]);const out=[];
-for(let i=1;i<lines.length;i++){const cols=this._splitLine(lines[i]);if(cols.length<hdr.length)continue;const row={};hdr.forEach((h,j)=>row[h.trim()]=cols[j]?.trim()||"");out.push(row)}return out}
-_splitLine(l){const r=[];let c="",q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch==='"')q=!q;else if(ch===","&&!q){r.push(c);c=""}else c+=ch}r.push(c);return r}
+_parseCSV(text){const lines=text.trim().split("\n");if(lines.length<2)return[];const hdr=this._split(lines[0]);const out=[];
+for(let i=1;i<lines.length;i++){const cols=this._split(lines[i]);if(cols.length<hdr.length)continue;const row={};hdr.forEach((h,j)=>row[h.trim()]=cols[j]?.trim()||"");out.push(row)}return out}
+_split(l){const r=[];let c="",q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch==='"')q=!q;else if(ch===","&&!q){r.push(c);c=""}else c+=ch}r.push(c);return r}
 
 _data(){return this._tab==="ALARM"?this._alarm:this._log}
 _unackCount(){return this._alarm.filter(r=>!r.ack).length}
@@ -38,7 +46,6 @@ _distEnts(){const s=new Set;this._data().forEach(r=>{if(r.entity)s.add(r.entity)
 
 _rows(){
 let rows=[...this._data()];
-// Default: hide acknowledged alarms
 if(this._tab==="ALARM"&&!this._showAck)rows=rows.filter(r=>!r.ack);
 if(this._fText){const ft=this._fText.toLowerCase();rows=rows.filter(r=>Object.values(r).some(v=>v.toLowerCase().includes(ft)))}
 if(this._fClass.size>0&&this._tab==="ALARM")rows=rows.filter(r=>this._fClass.has(r.class||""));
@@ -50,18 +57,28 @@ if(this._sortCol){rows.sort((a,b)=>{const va=a[this._sortCol]||"",vb=b[this._sor
 else rows.reverse();
 return rows.slice(0,this._c.rows)}
 
-_cntFilters(){let n=0;if(this._fClass.size>0)n++;if(this._fCat.size>0)n++;if(this._fEnt.size>0)n++;if(this._fFrom)n++;if(this._fTo)n++;return n}
-_clearFilters(){this._fClass.clear();this._fCat.clear();this._fEnt.clear();this._fFrom="";this._fTo="";this._fText="";
+_cntF(){let n=0;if(this._fClass.size>0)n++;if(this._fCat.size>0)n++;if(this._fEnt.size>0)n++;if(this._fFrom)n++;if(this._fTo)n++;return n}
+_clrF(){this._fClass.clear();this._fCat.clear();this._fEnt.clear();this._fFrom="";this._fTo="";this._fText="";
 const fi=this.shadowRoot.getElementById("filter");if(fi)fi.value="";this._updatePanel();this._update()}
 
-// ── Acknowledge ──
 async _ack(id){if(!this._hass)return;await this._hass.callService("hass_console","acknowledge_alarm",{id});await this._fetch()}
 async _ackAll(){if(!this._hass)return;await this._hass.callService("hass_console","acknowledge_all",{});await this._fetch()}
 
-// ── Render ──
 _render(){
+const dk=this._isDark();
 const S=`
-:host{--bg:#0c1117;--sf:#141b24;--bd:#1e2a36;--tx:#c8d6e0;--dim:#6b7f8e;--ac:#00d4aa;--red:#ff4757;--amb:#ffa502;--blu:#3b82f6;--hbg:#0f1820;--hov:rgba(0,212,170,.06);--fn:"SF Mono","Cascadia Code","JetBrains Mono","Fira Code",monospace}
+:host{
+  --bg:${dk?'#0c1117':'var(--ha-card-background, var(--card-background-color, #ffffff))'};
+  --sf:${dk?'#141b24':'var(--secondary-background-color, #f5f5f5)'};
+  --bd:${dk?'#1e2a36':'var(--divider-color, #e0e0e0)'};
+  --tx:${dk?'#c8d6e0':'var(--primary-text-color, #212121)'};
+  --dim:${dk?'#6b7f8e':'var(--secondary-text-color, #727272)'};
+  --ac:${dk?'#00d4aa':'var(--accent-color, #03a9f4)'};
+  --red:#ff4757;--amb:#ffa502;--blu:#3b82f6;--grn:#2ed573;
+  --hbg:${dk?'#0f1820':'var(--secondary-background-color, #fafafa)'};
+  --hov:${dk?'rgba(0,212,170,.06)':'rgba(0,0,0,.03)'};
+  --fn:"SF Mono","Cascadia Code","JetBrains Mono","Fira Code",monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 .wrap{background:var(--bg);border:1px solid var(--bd);border-radius:12px;overflow:hidden;font-family:var(--fn);font-size:12px;color:var(--tx)}
 .hbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--sf);border-bottom:1px solid var(--bd)}
@@ -74,17 +91,17 @@ const S=`
 .tbtn:hover{color:var(--tx)}.tbtn.active{color:var(--ac)}
 .tbtn.active::after{content:"";position:absolute;bottom:-2px;left:10%;width:80%;height:2px;background:var(--ac);border-radius:1px}
 .badge{display:inline-block;min-width:18px;padding:1px 5px;margin-left:6px;border-radius:9px;font-size:10px;font-weight:700;background:var(--bd);color:var(--dim)}
-.tbtn.active .badge{background:rgba(0,212,170,.15);color:var(--ac)}
+.tbtn.active .badge{background:${dk?'rgba(0,212,170,.15)':'rgba(3,169,244,.12)'};color:var(--ac)}
 .badge-unack{background:rgba(255,71,87,.15);color:var(--red)}
 .toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--sf);border-bottom:1px solid var(--bd);flex-wrap:wrap}
 .finput{flex:1;min-width:120px;padding:6px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:var(--fn);font-size:11px;outline:none}
-.finput:focus{border-color:var(--ac);box-shadow:0 0 0 2px rgba(0,212,170,.15)}
+.finput:focus{border-color:var(--ac);box-shadow:0 0 0 2px ${dk?'rgba(0,212,170,.15)':'rgba(3,169,244,.15)'}}
 .finput::placeholder{color:var(--dim)}
 .btn{padding:5px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--dim);font-family:var(--fn);font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap}
 .btn:hover{border-color:var(--ac);color:var(--ac)}
-.btn.has{border-color:var(--ac);color:var(--ac);background:rgba(0,212,170,.08)}
+.btn.has{border-color:var(--ac);color:var(--ac);background:${dk?'rgba(0,212,170,.08)':'rgba(3,169,244,.08)'}}
 .btn.ack-all{border-color:var(--red);color:var(--red)}.btn.ack-all:hover{background:rgba(255,71,87,.1)}
-.btn.show-ack.active{border-color:var(--ac);color:var(--ac);background:rgba(0,212,170,.08)}
+.btn.show-ack.active{border-color:var(--ac);color:var(--ac);background:${dk?'rgba(0,212,170,.08)':'rgba(3,169,244,.08)'}}
 .fcnt{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;font-size:9px;font-weight:800;background:var(--ac);color:var(--bg);margin-left:4px}
 .fpanel{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;background:var(--hbg);border-bottom:0px solid var(--bd)}
 .fpanel.open{max-height:500px;padding:12px 14px;border-bottom-width:1px}
@@ -92,10 +109,10 @@ const S=`
 .fgrp{display:flex;flex-direction:column;gap:5px}
 .flbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
 .fdate{padding:6px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:var(--fn);font-size:11px;outline:none;-webkit-appearance:none}
-.fdate:focus{border-color:var(--ac)}.fdate::-webkit-calendar-picker-indicator{filter:invert(.7)}
+.fdate:focus{border-color:var(--ac)}.fdate::-webkit-calendar-picker-indicator{filter:${dk?'invert(.7)':'none'}}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--sf);color:var(--dim);transition:all .15s;user-select:none}
-.chip:hover{border-color:var(--dim)}.chip.sel{border-color:var(--ac);color:var(--ac);background:rgba(0,212,170,.1)}
+.chip:hover{border-color:var(--dim)}.chip.sel{border-color:var(--ac);color:var(--ac);background:${dk?'rgba(0,212,170,.1)':'rgba(3,169,244,.08)'}}
 .chip.c01.sel{border-color:var(--red);color:var(--red);background:rgba(255,71,87,.1)}
 .chip.c02.sel{border-color:var(--amb);color:var(--amb);background:rgba(255,165,2,.1)}
 .chip.c03.sel{border-color:var(--blu);color:var(--blu);background:rgba(59,130,246,.1)}
@@ -112,16 +129,16 @@ tbody tr{border-bottom:1px solid var(--bd);transition:background .1s}tbody tr:ho
 tbody tr.acked{opacity:.45}
 td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-size:11.5px}
 .clb{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
-.c01{background:rgba(255,71,87,.15);color:var(--red)}.c02{background:rgba(255,165,2,.15);color:var(--amb)}.c03{background:rgba(59,130,246,.15);color:var(--blu)}.cdf{background:rgba(200,214,224,.1);color:var(--dim)}
-.catb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(0,212,170,.1);color:var(--ac);border:1px solid rgba(0,212,170,.25)}
+.c01{background:rgba(255,71,87,.15);color:var(--red)}.c02{background:rgba(255,165,2,.15);color:var(--amb)}.c03{background:rgba(59,130,246,.15);color:var(--blu)}.cdf{background:${dk?'rgba(200,214,224,.1)':'rgba(0,0,0,.06)'};color:var(--dim)}
+.catb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:${dk?'rgba(0,212,170,.1)':'rgba(3,169,244,.08)'};color:var(--ac);border:1px solid ${dk?'rgba(0,212,170,.25)':'rgba(3,169,244,.2)'}}
 .tsd{color:var(--dim)}.tst{color:var(--tx);font-weight:600}
 .ack-btn{padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:rgba(255,71,87,.08);color:var(--red);font-family:var(--fn);font-size:9px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px}
 .ack-btn:hover{background:rgba(255,71,87,.2)}
-.ack-done{font-size:10px;color:var(--ac);font-weight:600}
+.ack-done{font-size:10px;color:var(--grn);font-weight:600}
 .empty{padding:48px 16px;text-align:center;color:var(--dim)}.empty .icon{font-size:32px;margin-bottom:8px}.empty .msg{font-size:13px}
 .foot{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sf);border-top:1px solid var(--bd);font-size:10px;color:var(--dim)}
 .ftags{display:flex;gap:6px;flex-wrap:wrap}
-.ftag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:rgba(0,212,170,.1);color:var(--ac);border:1px solid rgba(0,212,170,.2)}
+.ftag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:${dk?'rgba(0,212,170,.1)':'rgba(3,169,244,.08)'};color:var(--ac);border:1px solid ${dk?'rgba(0,212,170,.2)':'rgba(3,169,244,.2)'}}
 .ftag .x{cursor:pointer;font-weight:800;margin-left:2px;opacity:.6}.ftag .x:hover{opacity:1}`;
 
 this.shadowRoot.innerHTML=`<style>${S}</style>
@@ -146,7 +163,6 @@ this.shadowRoot.getElementById("dlBtn").addEventListener("click",()=>{window.ope
 this.shadowRoot.getElementById("filterToggle").addEventListener("click",()=>{this._filtersOpen=!this._filtersOpen;this._updatePanel()});
 this._renderTabs()}
 
-// ── Tabs ──
 _renderTabs(){const c=this.shadowRoot.getElementById("tabs");const unack=this._unackCount();
 c.innerHTML=`<button class="tbtn ${this._tab==="ALARM"?"active":""}" data-t="ALARM">Alarm <span class="badge badge-unack">${unack}</span></button>
 <button class="tbtn ${this._tab==="LOG"?"active":""}" data-t="LOG">Log <span class="badge">${this._log.length}</span></button>`;
@@ -154,7 +170,6 @@ c.querySelectorAll(".tbtn").forEach(b=>b.addEventListener("click",()=>{
 this._tab=b.dataset.t;this._sortCol=null;this._sortDir="desc";this._fClass.clear();this._fCat.clear();this._fEnt.clear();
 this._renderTabs();this._updatePanel();this._update()}))}
 
-// ── Ack buttons in toolbar ──
 _renderAckBtns(){const el=this.shadowRoot.getElementById("ackBtns");
 if(this._tab!=="ALARM"){el.innerHTML="";return}
 const unack=this._unackCount();
@@ -164,8 +179,7 @@ el.innerHTML=html;
 el.querySelector("#toggleAck")?.addEventListener("click",()=>{this._showAck=!this._showAck;this._update()});
 el.querySelector("#ackAllBtn")?.addEventListener("click",()=>this._ackAll())}
 
-// ── Filter Panel ──
-_updatePanel(){const p=this.shadowRoot.getElementById("fp");const t=this.shadowRoot.getElementById("filterToggle");const n=this._cntFilters();
+_updatePanel(){const p=this.shadowRoot.getElementById("fp");const t=this.shadowRoot.getElementById("filterToggle");const n=this._cntF();
 p.classList.toggle("open",this._filtersOpen);t.className=`btn${n>0?" has":""}`;t.innerHTML=`⚙ Filters${n>0?`<span class="fcnt">${n}</span>`:""}`;
 if(!this._filtersOpen){p.innerHTML="";return}
 const cls=this._distClasses(),cats=this._distCats(),ents=this._distEnts();
@@ -187,9 +201,8 @@ wire("#clsC .chip",this._fClass);wire("#catC .chip",this._fCat);wire("#entC .chi
 p.querySelector("#df")?.addEventListener("change",e=>{this._fFrom=e.target.value;this._updatePanel();this._update()});
 p.querySelector("#dt")?.addEventListener("change",e=>{this._fTo=e.target.value;this._updatePanel();this._update()});
 p.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{this._fFrom=b.dataset.f;this._fTo=b.dataset.t;this._updatePanel();this._update()}));
-p.querySelector("#fclr")?.addEventListener("click",()=>this._clearFilters())}
+p.querySelector("#fclr")?.addEventListener("click",()=>this._clrF())}
 
-// ── Footer tags ──
 _renderFoot(){const el=this.shadowRoot.getElementById("ftags");if(!el)return;const tags=[];
 if(this._fClass.size)tags.push({l:`Class: ${[...this._fClass]}`,c:()=>this._fClass.clear()});
 if(this._fCat.size)tags.push({l:`Cat: ${[...this._fCat]}`,c:()=>this._fCat.clear()});
@@ -198,13 +211,10 @@ if(this._fFrom||this._fTo)tags.push({l:`Date: ${this._fFrom||"…"}→${this._fT
 el.innerHTML=tags.map((t,i)=>`<span class="ftag">${t.l}<span class="x" data-i="${i}">✕</span></span>`).join("");
 el.querySelectorAll(".x").forEach(x=>x.addEventListener("click",()=>{tags[parseInt(x.dataset.i)]?.c();this._updatePanel();this._update()}))}
 
-// ── Columns ──
 _cols(){
-if(this._tab==="ALARM"){const cols=[{k:"timestamp",l:"Timestamp"},{k:"category",l:"Category"},{k:"entity",l:"Entity"},{k:"class",l:"Class"},
-{k:"value",l:"Value"},{k:"duration",l:"Duration"},{k:"note",l:"Note"},{k:"trigger",l:"Trigger"},{k:"_ack",l:""}];return cols}
+if(this._tab==="ALARM")return[{k:"timestamp",l:"Timestamp"},{k:"category",l:"Category"},{k:"entity",l:"Entity"},{k:"class",l:"Class"},{k:"value",l:"Value"},{k:"duration",l:"Duration"},{k:"note",l:"Note"},{k:"trigger",l:"Trigger"},{k:"_ack",l:""}];
 return[{k:"timestamp",l:"Timestamp"},{k:"category",l:"Category"},{k:"entity",l:"Entity"},{k:"value",l:"Value"},{k:"note",l:"Note"}]}
 
-// ── Table update ──
 _update(){this._renderTabs();this._renderAckBtns();this._renderFoot();
 const cols=this._cols(),rows=this._rows();
 const thead=this.shadowRoot.getElementById("thead");
@@ -215,25 +225,24 @@ thead.querySelectorAll("th[data-c]").forEach(th=>th.addEventListener("click",()=
 const c=th.dataset.c;if(this._sortCol===c)this._sortDir=this._sortDir==="asc"?"desc":"asc";else{this._sortCol=c;this._sortDir="asc"}this._update()}));
 
 const tbody=this.shadowRoot.getElementById("tbody");
-if(!rows.length){const hasF=this._cntFilters()>0||this._fText;const icon=hasF?"🔍":this._tab==="ALARM"?"🔔":"📋";
+if(!rows.length){const hasF=this._cntF()>0||this._fText;const icon=hasF?"🔍":this._tab==="ALARM"?"🔔":"📋";
 const msg=hasF?"No entries match current filters":this._tab==="ALARM"&&!this._showAck?"No unacknowledged alarms":`No ${this._tab.toLowerCase()} entries yet`;
 tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class="icon">${icon}</div><div class="msg">${msg}</div></div></td></tr>`}
 else{tbody.innerHTML=rows.map(r=>{
-const isAcked=!!(r.ack);const trCls=isAcked?"acked":"";
-return`<tr class="${trCls}">${cols.map(c=>{
-if(c.k==="_ack"){if(isAcked)return`<td><span class="ack-done">✓ ${this._esc(r.ack)}</span></td>`;
+const isA=!!(r.ack);const trC=isA?"acked":"";
+return`<tr class="${trC}">${cols.map(c=>{
+if(c.k==="_ack"){if(isA)return`<td><span class="ack-done">✓ ${this._esc(r.ack)}</span></td>`;
 return`<td><button class="ack-btn" data-id="${this._esc(r.id||"")}">ACK</button></td>`}
-return`<td>${this._fmtCell(c.k,r[c.k]||"")}</td>`}).join("")}</tr>`}).join("")}
+return`<td>${this._fmt(c.k,r[c.k]||"")}</td>`}).join("")}</tr>`}).join("")}
 
-// Wire ACK buttons
 tbody.querySelectorAll(".ack-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();this._ack(b.dataset.id)}));
 
 const total=this._data().length;const showing=rows.length;
-const filteredNote=this._tab==="ALARM"&&!this._showAck?` (${this._alarm.length-this._unackCount()} ack'd hidden)`:"";
-this.shadowRoot.getElementById("rc").textContent=total!==showing?`${showing} of ${total} rows${filteredNote}`:`${showing} rows${filteredNote}`;
+const note=this._tab==="ALARM"&&!this._showAck?` (${this._alarm.length-this._unackCount()} ack'd hidden)`:"";
+this.shadowRoot.getElementById("rc").textContent=total!==showing?`${showing} of ${total} rows${note}`:`${showing} rows${note}`;
 this.shadowRoot.getElementById("meta").textContent=`Refreshed ${new Date().toLocaleTimeString()}`}
 
-_fmtCell(k,v){
+_fmt(k,v){
 if(k==="timestamp"&&v){const p=v.split(' ');if(p.length===2&&/^\d{4}-\d{2}-\d{2}$/.test(p[0]))return`<span class="tsd">${this._esc(p[0])}</span> <span class="tst">${this._esc(p[1])}</span>`;
 const d=parseTS(v);if(d){return`<span class="tsd">${d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"})}</span> <span class="tst">${d.toLocaleTimeString("en-US",{hour12:false})}</span>`}return this._esc(v)}
 if(k==="class"&&v){const c=v==="01"?"c01":v==="02"?"c02":v==="03"?"c03":"cdf";return`<span class="clb ${c}">${this._esc(v)}</span>`}
@@ -244,7 +253,7 @@ return this._esc(v)}
 _esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
 getCardSize(){return 8}
 disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
-static getStubConfig(){return{title:"HASS Console",alarm_csv:"/local/hass-console-alarms.csv",log_csv:"/local/hass-console-logs.csv",rows:200,refresh_interval:30}}
+static getStubConfig(){return{title:"HASS Console",alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30}}
 }
 
 customElements.define("hass-console-card",HassConsoleCard);

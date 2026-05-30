@@ -1,6 +1,6 @@
 write_log:
   name: Write Log Entry
-  description: Manually write a LOG row to hass-console-logs.csv
+  description: Manually write a LOG row to logs.csv
   fields:
     entity:
       name: Entity
@@ -24,10 +24,17 @@ write_log:
       required: false
       selector:
         text:
+    target_csv:
+      name: Target CSV
+      description: Optional custom CSV filename (e.g. electrical_meters.csv) or absolute path
+      required: false
+      example: "electrical_meters.csv"
+      selector:
+        text:
 
 write_alarm:
   name: Write Alarm Entry
-  description: Manually write an ALARM row to hass-console-alarms.csv
+  description: Manually write an ALARM row to alarms.csv
   fields:
     entity:
       name: Entity
@@ -64,6 +71,13 @@ write_alarm:
     trigger:
       name: Trigger
       required: false
+      selector:
+        text:
+    target_csv:
+      name: Target CSV
+      description: Optional custom CSV filename or absolute path
+      required: false
+      example: "hvac_alarms.csv"
       selector:
         text:
 

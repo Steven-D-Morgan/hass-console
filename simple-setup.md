@@ -85,8 +85,8 @@ Settings → System → Restart. A full restart is required because this is a cu
 3. Search for **HASS Console**
 4. Confirm the three paths (defaults are usually correct):
    - **Console YAML path** — `/config/console.yaml`
-   - **Alarm CSV output path** — `/config/www/hass-console-alarms.csv`
-   - **Log CSV output path** — `/config/www/hass-console-logs.csv`
+   - **Alarm CSV output path** — `/config/www/hass-console/alarms.csv`
+   - **Log CSV output path** — `/config/www/hass-console/logs.csv`
 5. Click **Submit**
 
 You'll see a HASS Console card on the Integrations page with a **Configure** button (to change paths later) and a **⋮ → Reload** option.
@@ -124,8 +124,8 @@ Restart HA again.
 ```yaml
 type: custom:hass-console-card
 title: HASS Console
-alarm_csv: /local/hass-console-alarms.csv
-log_csv: /local/hass-console-logs.csv
+alarm_csv: /local/hass-console/alarms.csv
+log_csv: /local/hass-console/logs.csv
 rows: 200
 refresh_interval: 30
 ```

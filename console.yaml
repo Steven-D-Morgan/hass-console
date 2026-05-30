@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────
-# LOG POINTS — scheduled reads of entity values
+# LOG POINTS
 # ──────────────────────────────────────────────────
 
 DAILY_KWH:
@@ -16,22 +16,16 @@ HOURLY_HUMIDITY:
   category: HVAC
   note: "Hourly humidity reading"
 
-WEEKLY_WATER:
+MAIN_PANEL_KWH:
   type: LOG
-  cron: "0 8 * * 1"
-  entity: sensor.water_meter_gallons
-  category: W-METER
-  note: "Weekly water usage (Monday 8am)"
-
-CAR_LOCATION:
-  type: LOG
-  cron: "*/15 * * * *"
-  entity: device_tracker.my_car
-  category: GPS
-  note: "Vehicle location every 15 minutes"
+  cron: "0 * * * *"
+  entity: sensor.main_panel_kwh
+  category: E-METER
+  target_csv: electrical_meters.csv
+  note: "Main panel hourly kWh"
 
 # ──────────────────────────────────────────────────
-# ALARM POINTS — triggered by entity state conditions
+# ALARM POINTS — numeric_state triggers
 # ──────────────────────────────────────────────────
 
 TEMPERATURE_ALARM:
@@ -48,44 +42,103 @@ TEMPERATURE_ALARM:
       for:
         minutes: 10
 
-FREEZER_ALARM:
+# ──────────────────────────────────────────────────
+# ALARM POINTS — state triggers (new in v2.5)
+# ──────────────────────────────────────────────────
+
+GARAGE_DOOR_OPEN:
+  type: ALARM
+  class: "02"
+  category: SECURITY
+  entity: binary_sensor.garage_door
+  note: "Garage door left open"
+  trigger:
+    - alias: "Door open for 5 min"
+      platform: state
+      entity_id: binary_sensor.garage_door
+      to: "on"
+      for:
+        minutes: 5
+
+WASHER_FINISHED:
+  type: ALARM
+  class: "03"
+  category: APPLIANCE
+  entity: sensor.washer_status
+  note: "Washer cycle complete"
+  trigger:
+    - alias: "Washer finished"
+      platform: state
+      entity_id: sensor.washer_status
+      to: "complete"
+      from: "running"
+
+DEVICE_OFFLINE:
+  type: ALARM
+  class: "01"
+  category: NETWORK
+  entity: binary_sensor.server_ping
+  note: "Server went offline"
+  trigger:
+    - alias: "Offline for 2 min"
+      platform: state
+      entity_id: binary_sensor.server_ping
+      to: "off"
+      for:
+        minutes: 2
+
+# ──────────────────────────────────────────────────
+# ALARM POINTS — multi-condition AND (new in v2.5)
+# ──────────────────────────────────────────────────
+
+# Primary trigger fires only if ALL conditions are also true
+HOT_AND_HUMID:
   type: ALARM
   class: "02"
   category: HVAC
-  entity: sensor.garage_freezer_temperature
-  note: "Garage freezer temp rising"
+  entity: sensor.server_room_temperature
+  note: "Server room hot AND humid"
   trigger:
-    - alias: "Freezer above 10°F for 30 min"
+    - alias: "Temp >80 AND humidity >60% for 10 min"
       platform: numeric_state
-      entity_id: sensor.garage_freezer_temperature
-      above: 10
+      entity_id: sensor.server_room_temperature
+      above: 80
+      conditions:
+        - entity_id: sensor.server_room_humidity
+          above: 60
       for:
-        minutes: 30
+        minutes: 10
 
-LOW_BATTERY:
-  type: ALARM
-  class: "03"
-  category: UPS
-  entity: sensor.ups_battery_level
-  note: "UPS battery low"
-  trigger:
-    - alias: "Battery below 20%"
-      platform: numeric_state
-      entity_id: sensor.ups_battery_level
-      below: 20
-      for:
-        minutes: 5
-
-HIGH_POWER_DRAW:
+# State trigger + numeric condition
+DOOR_OPEN_WHILE_HOT:
   type: ALARM
   class: "01"
+  category: SECURITY
+  entity: binary_sensor.server_room_door
+  note: "Server room door open while overheating"
+  trigger:
+    - alias: "Door opened while temp >85"
+      platform: state
+      entity_id: binary_sensor.server_room_door
+      to: "on"
+      conditions:
+        - entity_id: sensor.server_room_temperature
+          above: 85
+
+# Numeric trigger + state condition
+POWER_HIGH_WHILE_AWAY:
+  type: ALARM
+  class: "02"
   category: E-METER
   entity: sensor.main_panel_watts
-  note: "Excessive power draw"
+  note: "High power draw while nobody home"
   trigger:
-    - alias: "Above 8000W for 5 min"
+    - alias: "Above 5kW while away for 15 min"
       platform: numeric_state
       entity_id: sensor.main_panel_watts
-      above: 8000
+      above: 5000
+      conditions:
+        - entity_id: person.steven
+          state: "not_home"
       for:
-        minutes: 5
+        minutes: 15

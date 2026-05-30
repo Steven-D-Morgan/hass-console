@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import csv
 import logging
-import os
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -31,13 +30,17 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN,
     CONF_TYPE, CONF_CRON, CONF_ENTITY, CONF_NOTE, CONF_CLASS,
-    CONF_TRIGGER, CONF_CATEGORY,
+    CONF_TRIGGER, CONF_CATEGORY, CONF_TARGET_CSV,
     CONF_CONSOLE_YAML, CONF_ALARM_CSV, CONF_LOG_CSV,
     DEFAULT_CONSOLE_YAML, DEFAULT_ALARM_CSV, DEFAULT_LOG_CSV,
     ALARM_COLUMNS, LOG_COLUMNS, TIMESTAMP_FORMAT, TYPE_LOG, TYPE_ALARM,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+PLATFORM_NUMERIC = "numeric_state"
+PLATFORM_STATE = "state"
+SUPPORTED_PLATFORMS = {PLATFORM_NUMERIC, PLATFORM_STATE}
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -80,8 +83,37 @@ def cron_matches_now(cron_expr: str, now: datetime) -> bool:
 
 
 def _gen_id() -> str:
-    """Generate a short unique ID for an alarm row."""
     return uuid.uuid4().hex[:8]
+
+
+# ──────────────────────────────────────────────────────────────────
+# Condition evaluation helpers
+# ──────────────────────────────────────────────────────────────────
+
+def _check_numeric(state_val: str, above, below) -> bool:
+    """Check if a numeric value exceeds above/below thresholds."""
+    try:
+        val = float(state_val)
+    except (ValueError, TypeError):
+        return False
+    if above is not None and val <= float(above):
+        return False
+    if below is not None and val >= float(below):
+        return False
+    return True
+
+
+def _check_state_match(new_state: str, old_state: str | None, to_val, from_val) -> bool:
+    """Check if a state transition matches to/from criteria."""
+    if to_val is not None:
+        to_list = to_val if isinstance(to_val, list) else [str(to_val)]
+        if new_state not in [str(v) for v in to_list]:
+            return False
+    if from_val is not None and old_state is not None:
+        from_list = from_val if isinstance(from_val, list) else [str(from_val)]
+        if old_state not in [str(v) for v in from_list]:
+            return False
+    return True
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -101,46 +133,61 @@ class HassConsoleEngine:
         self._unsub_listeners: list = []
         self._alarm_csv = Path(alarm_csv_path)
         self._log_csv = Path(log_csv_path)
-        self._alarm_lock = asyncio.Lock()
-        self._log_lock = asyncio.Lock()
+        self._log_files: set[Path] = {self._log_csv}
+        self._alarm_files: set[Path] = {self._alarm_csv}
+        self._file_locks: dict[str, asyncio.Lock] = {}
 
     async def async_setup(self) -> None:
-        await self.hass.async_add_executor_job(self._ensure_csvs)
         self._parse_points()
+        await self.hass.async_add_executor_job(self._ensure_csvs)
         await self._setup_cron_scanner()
         self._setup_alarm_listeners()
-        _LOGGER.info("HASS Console engine started: %d points loaded", len(self.points))
+        _LOGGER.info(
+            "HASS Console started: %d points, %d log file(s), %d alarm file(s)",
+            len(self.points), len(self._log_files), len(self._alarm_files),
+        )
+
+    # ── Path + lock helpers ──
+
+    def _resolve_csv_path(self, target: str, default_path: Path) -> Path:
+        if not target:
+            return default_path
+        p = Path(target)
+        return p if p.is_absolute() else default_path.parent / target
+
+    def _lock_for(self, path: Path) -> asyncio.Lock:
+        key = str(path)
+        lock = self._file_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._file_locks[key] = lock
+        return lock
+
+    # ── CSV file management ──
 
     def _ensure_csvs(self) -> None:
-        self._alarm_csv.parent.mkdir(parents=True, exist_ok=True)
-        self._log_csv.parent.mkdir(parents=True, exist_ok=True)
-        self._migrate_or_create(self._alarm_csv, ALARM_COLUMNS, generate_ids=True)
-        self._migrate_or_create(self._log_csv, LOG_COLUMNS, generate_ids=False)
+        for path in self._log_files:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._migrate_or_create(path, LOG_COLUMNS, generate_ids=False)
+        for path in self._alarm_files:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._migrate_or_create(path, ALARM_COLUMNS, generate_ids=True)
 
-    def _migrate_or_create(
-        self, path: Path, expected: list[str], generate_ids: bool = False,
-    ) -> None:
+    def _migrate_or_create(self, path: Path, expected: list[str], generate_ids: bool = False) -> None:
         if not path.exists():
             with open(path, "w", newline="") as f:
                 csv.writer(f).writerow(expected)
-            _LOGGER.info("Created CSV at %s", path)
             return
-
         with open(path, "r", newline="") as f:
-            reader = csv.reader(f)
             try:
-                header = [h.strip() for h in next(reader)]
+                header = [h.strip() for h in next(csv.reader(f))]
             except StopIteration:
                 header = []
-
         if header == expected:
             return
-
         _LOGGER.info("Migrating CSV %s to new schema", path)
         with open(path, "r", newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
+            rows = list(csv.DictReader(f))
         with open(path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=expected)
             writer.writeheader()
@@ -151,6 +198,8 @@ class HassConsoleEngine:
                 writer.writerow(filled)
 
     def _parse_points(self) -> None:
+        self._log_files = {self._log_csv}
+        self._alarm_files = {self._alarm_csv}
         for name, pcfg in self.config.items():
             if not isinstance(pcfg, dict):
                 continue
@@ -159,6 +208,13 @@ class HassConsoleEngine:
                 continue
             header = name.upper()
             eid = f"hass_console.{pt.lower()}_{header.lower()}"
+            target = str(pcfg.get(CONF_TARGET_CSV, "")).strip()
+            if pt == TYPE_LOG:
+                target_file = self._resolve_csv_path(target, self._log_csv)
+                self._log_files.add(target_file)
+            else:
+                target_file = self._resolve_csv_path(target, self._alarm_csv)
+                self._alarm_files.add(target_file)
             self.points[name] = {
                 "name": name, "header": header, "type": pt, "entity_id": eid,
                 "source_entity": pcfg.get(CONF_ENTITY),
@@ -166,6 +222,7 @@ class HassConsoleEngine:
                 "note": pcfg.get(CONF_NOTE, ""),
                 "class": pcfg.get(CONF_CLASS, ""),
                 "category": str(pcfg.get(CONF_CATEGORY, "")).strip(),
+                "target_file": target_file,
                 "trigger": pcfg.get(CONF_TRIGGER, []),
             }
 
@@ -187,27 +244,52 @@ class HassConsoleEngine:
 
     def _setup_alarm_listeners(self) -> None:
         for name, point in self.points.items():
-            if point["type"] != TYPE_ALARM: continue
+            if point["type"] != TYPE_ALARM:
+                continue
             for trig in point.get("trigger", []):
-                if not isinstance(trig, dict): continue
-                if trig.get(CONF_PLATFORM, trig.get("platform")) != "numeric_state": continue
+                if not isinstance(trig, dict):
+                    continue
+                platform = trig.get(CONF_PLATFORM, trig.get("platform", ""))
+                if platform not in SUPPORTED_PLATFORMS:
+                    _LOGGER.warning(
+                        "Point '%s' trigger has unsupported platform '%s', skipping",
+                        name, platform,
+                    )
+                    continue
+
                 target = trig.get(CONF_ENTITY_ID, trig.get("entity_id", point.get("source_entity")))
-                if not target: continue
-                above = trig.get(CONF_ABOVE, trig.get("above"))
-                below = trig.get(CONF_BELOW, trig.get("below"))
-                for_d = trig.get(CONF_FOR, trig.get("for", {}))
+                if not target:
+                    continue
                 alias = trig.get(CONF_ALIAS, trig.get("alias", name))
+                for_d = trig.get(CONF_FOR, trig.get("for", {}))
                 dur = (
                     for_d.get("hours", 0) * 3600 +
                     for_d.get("minutes", 0) * 60 +
                     for_d.get("seconds", 0)
                 ) if isinstance(for_d, dict) else 0
 
+                # Parse AND conditions (optional)
+                raw_conditions = trig.get("conditions", [])
+                conditions = []
+                for cond in raw_conditions:
+                    if isinstance(cond, dict):
+                        conditions.append(cond)
+
                 akey = f"{name}_{target}_{alias}"
                 self._alarm_states[akey] = {
                     "active": False, "triggered_at": None, "recorded": False,
-                    "point": point, "above": above, "below": below,
-                    "duration": dur, "alias": alias, "entity_id": target,
+                    "point": point,
+                    "platform": platform,
+                    "alias": alias,
+                    "entity_id": target,
+                    "duration": dur,
+                    "conditions": conditions,
+                    # numeric_state fields
+                    "above": trig.get(CONF_ABOVE, trig.get("above")),
+                    "below": trig.get(CONF_BELOW, trig.get("below")),
+                    # state fields
+                    "to_state": trig.get("to"),
+                    "from_state": trig.get("from"),
                 }
 
                 @callback
@@ -219,26 +301,78 @@ class HassConsoleEngine:
 
     async def _eval_alarm(self, key, event):
         a = self._alarm_states.get(key)
-        if not a: return
-        ns = event.data.get("new_state")
-        if not ns: return
-        try:
-            val = float(ns.state)
-        except (ValueError, TypeError):
+        if not a:
             return
-        ok = True
-        if a["above"] is not None and val <= float(a["above"]): ok = False
-        if a["below"] is not None and val >= float(a["below"]): ok = False
+        new_s: State | None = event.data.get("new_state")
+        old_s: State | None = event.data.get("old_state")
+        if not new_s:
+            return
+        if new_s.state in ("unavailable", "unknown"):
+            return
+
+        # ── Primary condition check based on platform ──
+        platform = a["platform"]
+        if platform == PLATFORM_NUMERIC:
+            primary_ok = _check_numeric(new_s.state, a["above"], a["below"])
+            display_val = new_s.state
+        elif platform == PLATFORM_STATE:
+            old_val = old_s.state if old_s else None
+            primary_ok = _check_state_match(
+                new_s.state, old_val, a["to_state"], a["from_state"]
+            )
+            display_val = new_s.state
+        else:
+            return
+
+        # ── AND conditions — all must be true right now ──
+        if primary_ok and a["conditions"]:
+            for cond in a["conditions"]:
+                if not self._check_condition(cond):
+                    primary_ok = False
+                    break
+
+        # ── Duration tracking + recording ──
         now = dt_util.now()
-        if ok and not a["active"]:
-            a["active"], a["triggered_at"], a["recorded"] = True, now, False
-        elif ok and a["active"] and not a["recorded"]:
-            if (now - a["triggered_at"]).total_seconds() >= a["duration"]:
-                await self._record_alarm(a["point"], now, val,
-                    (now - a["triggered_at"]).total_seconds(), a["alias"])
+        if primary_ok and not a["active"]:
+            a["active"] = True
+            a["triggered_at"] = now
+            a["recorded"] = False
+        elif primary_ok and a["active"] and not a["recorded"]:
+            elapsed = (now - a["triggered_at"]).total_seconds()
+            if elapsed >= a["duration"]:
+                await self._record_alarm(
+                    a["point"], now, display_val, elapsed, a["alias"]
+                )
                 a["recorded"] = True
-        elif not ok and a["active"]:
-            a["active"], a["triggered_at"], a["recorded"] = False, None, False
+        elif not primary_ok and a["active"]:
+            a["active"] = False
+            a["triggered_at"] = None
+            a["recorded"] = False
+
+    def _check_condition(self, cond: dict) -> bool:
+        """Evaluate an AND condition against current entity state."""
+        entity_id = cond.get("entity_id")
+        if not entity_id:
+            return True
+        state_obj = self.hass.states.get(entity_id)
+        if not state_obj:
+            return False
+        if state_obj.state in ("unavailable", "unknown"):
+            return False
+
+        # Numeric: above / below
+        above = cond.get("above")
+        below = cond.get("below")
+        if above is not None or below is not None:
+            return _check_numeric(state_obj.state, above, below)
+
+        # State: exact match
+        state_val = cond.get("state")
+        if state_val is not None:
+            match_list = state_val if isinstance(state_val, list) else [str(state_val)]
+            return state_obj.state in [str(v) for v in match_list]
+
+        return True
 
     # ── Record rows ──
 
@@ -255,7 +389,7 @@ class HassConsoleEngine:
             "value": val,
             "note": point.get("note", ""),
         }
-        await self._write_log_row(row)
+        await self._write_log_row(row, point.get("target_file"))
         self.hass.states.async_set(point["entity_id"], val, {
             "friendly_name": f"HASS Console Log: {point['header']}",
             "last_logged": now.strftime(TIMESTAMP_FORMAT),
@@ -277,7 +411,7 @@ class HassConsoleEngine:
             "trigger": alias,
             "ack": "",
         }
-        await self._write_alarm_row(row)
+        await self._write_alarm_row(row, point.get("target_file"))
         self.hass.states.async_set(point["entity_id"], "ALARM", {
             "friendly_name": f"HASS Console Alarm: {point['header']}",
             "last_alarm": now.strftime(TIMESTAMP_FORMAT),
@@ -291,36 +425,45 @@ class HassConsoleEngine:
 
     # ── CSV writers ──
 
-    async def _write_alarm_row(self, row):
-        async with self._alarm_lock:
-            await self.hass.async_add_executor_job(
-                self._append_sync, self._alarm_csv, row, ALARM_COLUMNS)
+    async def _write_log_row(self, row, target: Path | None = None):
+        path = target or self._log_csv
+        async with self._lock_for(path):
+            await self.hass.async_add_executor_job(self._append_sync, path, row, LOG_COLUMNS)
 
-    async def _write_log_row(self, row):
-        async with self._log_lock:
-            await self.hass.async_add_executor_job(
-                self._append_sync, self._log_csv, row, LOG_COLUMNS)
+    async def _write_alarm_row(self, row, target: Path | None = None):
+        path = target or self._alarm_csv
+        async with self._lock_for(path):
+            await self.hass.async_add_executor_job(self._append_sync, path, row, ALARM_COLUMNS)
 
-    def _append_sync(self, path, row, cols):
+    def _append_sync(self, path: Path, row, cols):
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        need_header = not path.exists() or path.stat().st_size == 0
         with open(path, "a", newline="") as f:
-            csv.DictWriter(f, fieldnames=cols).writerow(row)
+            writer = csv.DictWriter(f, fieldnames=cols)
+            if need_header:
+                writer.writeheader()
+            writer.writerow({c: row.get(c, "") for c in cols})
 
     # ── Acknowledge ──
 
     async def acknowledge_alarm(self, alarm_id: str, note: str = "") -> bool:
-        """Mark a single alarm as acknowledged. Returns True if found."""
-        async with self._alarm_lock:
-            return await self.hass.async_add_executor_job(
-                self._ack_sync, alarm_id, note)
+        for path in self._alarm_files:
+            async with self._lock_for(path):
+                found = await self.hass.async_add_executor_job(self._ack_sync, path, alarm_id, note)
+            if found:
+                return True
+        return False
 
     async def acknowledge_all(self, note: str = "") -> int:
-        """Acknowledge all unacknowledged alarms. Returns count."""
-        async with self._alarm_lock:
-            return await self.hass.async_add_executor_job(
-                self._ack_all_sync, note)
+        total = 0
+        for path in self._alarm_files:
+            async with self._lock_for(path):
+                total += await self.hass.async_add_executor_job(self._ack_all_sync, path, note)
+        return total
 
-    def _ack_sync(self, alarm_id: str, note: str) -> bool:
-        rows = self._read_alarm_rows()
+    def _ack_sync(self, path, alarm_id, note):
+        rows = self._read_rows(path)
         found = False
         for row in rows:
             if row.get("id") == alarm_id and not row.get("ack"):
@@ -328,11 +471,11 @@ class HassConsoleEngine:
                 found = True
                 break
         if found:
-            self._write_alarm_rows(rows)
+            self._write_rows(path, rows)
         return found
 
-    def _ack_all_sync(self, note: str) -> int:
-        rows = self._read_alarm_rows()
+    def _ack_all_sync(self, path, note):
+        rows = self._read_rows(path)
         now_str = dt_util.now().strftime(TIMESTAMP_FORMAT)
         count = 0
         for row in rows:
@@ -340,17 +483,17 @@ class HassConsoleEngine:
                 row["ack"] = now_str
                 count += 1
         if count:
-            self._write_alarm_rows(rows)
+            self._write_rows(path, rows)
         return count
 
-    def _read_alarm_rows(self) -> list[dict]:
-        if not self._alarm_csv.exists():
-            return []
-        with open(self._alarm_csv, "r", newline="") as f:
+    def _read_rows(self, path):
+        path = Path(path)
+        if not path.exists(): return []
+        with open(path, "r", newline="") as f:
             return list(csv.DictReader(f))
 
-    def _write_alarm_rows(self, rows: list[dict]) -> None:
-        with open(self._alarm_csv, "w", newline="") as f:
+    def _write_rows(self, path, rows):
+        with open(path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=ALARM_COLUMNS)
             writer.writeheader()
             for row in rows:
@@ -422,14 +565,11 @@ async def async_setup_entry(hass, entry):
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
-
 async def async_unload_entry(hass, entry):
     d = hass.data.get(DOMAIN, {})
     engine = d.pop(entry.entry_id, None)
-    if engine:
-        await engine.async_teardown()
+    if engine: await engine.async_teardown()
     return True
-
 
 async def _async_update_listener(hass, entry):
     await hass.config_entries.async_reload(entry.entry_id)
@@ -446,17 +586,22 @@ def _register_services(hass):
     async def _svc_write_log(call):
         engine = _get_active_engine(hass)
         if not engine: return
+        target = call.data.get("target_csv", "").strip()
+        path = engine._resolve_csv_path(target, engine._log_csv) if target else None
         await engine._write_log_row({
             "timestamp": dt_util.now().strftime(TIMESTAMP_FORMAT),
             "category": call.data.get("category", ""),
             "entity": call.data.get("entity", ""),
             "value": call.data.get("value", ""),
             "note": call.data.get("note", ""),
-        })
+        }, path)
 
     async def _svc_write_alarm(call):
         engine = _get_active_engine(hass)
         if not engine: return
+        target = call.data.get("target_csv", "").strip()
+        path = engine._resolve_csv_path(target, engine._alarm_csv) if target else None
+        if path: engine._alarm_files.add(path)
         await engine._write_alarm_row({
             "id": _gen_id(),
             "timestamp": dt_util.now().strftime(TIMESTAMP_FORMAT),
@@ -468,22 +613,19 @@ def _register_services(hass):
             "note": call.data.get("note", ""),
             "trigger": call.data.get("trigger", ""),
             "ack": "",
-        })
+        }, path)
 
     async def _svc_ack(call):
         engine = _get_active_engine(hass)
         if not engine: return
-        alarm_id = call.data.get("id", "")
-        note = call.data.get("note", "")
-        found = await engine.acknowledge_alarm(alarm_id, note)
+        found = await engine.acknowledge_alarm(call.data.get("id", ""), call.data.get("note", ""))
         if not found:
-            _LOGGER.warning("Acknowledge: alarm ID '%s' not found or already acknowledged", alarm_id)
+            _LOGGER.warning("Acknowledge: alarm ID '%s' not found", call.data.get("id", ""))
 
     async def _svc_ack_all(call):
         engine = _get_active_engine(hass)
         if not engine: return
-        note = call.data.get("note", "")
-        count = await engine.acknowledge_all(note)
+        count = await engine.acknowledge_all(call.data.get("note", ""))
         _LOGGER.info("Acknowledged %d alarms", count)
 
     async def _svc_reload(call):
@@ -502,6 +644,7 @@ def _register_services(hass):
         vol.Optional("category", default=""): cv.string,
         vol.Optional("value", default=""): cv.string,
         vol.Optional("note", default=""): cv.string,
+        vol.Optional("target_csv", default=""): cv.string,
     }))
     hass.services.async_register(DOMAIN, "write_alarm", _svc_write_alarm, schema=vol.Schema({
         vol.Required("entity"): cv.string,
@@ -511,6 +654,7 @@ def _register_services(hass):
         vol.Optional("duration", default=""): cv.string,
         vol.Optional("note", default=""): cv.string,
         vol.Optional("trigger", default=""): cv.string,
+        vol.Optional("target_csv", default=""): cv.string,
     }))
     hass.services.async_register(DOMAIN, "acknowledge_alarm", _svc_ack, schema=vol.Schema({
         vol.Required("id"): cv.string,

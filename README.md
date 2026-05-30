@@ -51,7 +51,7 @@ HASS Console is a custom integration (domain: `hass_console`) with three parts:
 │  └───────┬──────────┘     └──────────┬───────────┘           │
 │          │                           │                       │
 │          ▼                           ▼                       │
-│  hass-console-logs.csv       hass-console-alarms.csv         │
+│  logs.csv       alarms.csv         │
 │  /config/www/                /config/www/                    │
 └──────────────────────────────────────────────────────────────┘
                │
@@ -113,8 +113,8 @@ SERVER_ROOM_TEMP:
 After restarting HA, you'll have:
 - Entity `hass_console.log_daily_kwh` — updates at midnight with the meter's value
 - Entity `hass_console.alarm_server_room_temp` — goes to "ALARM" when triggered
-- A row in `hass-console-logs.csv` every midnight
-- A row in `hass-console-alarms.csv` each time the temperature stays above 80°F for 5+ minutes, starting as unacknowledged
+- A row in `logs.csv` every midnight
+- A row in `alarms.csv` each time the temperature stays above 80°F for 5+ minutes, starting as unacknowledged
 
 Add the Lovelace card and test immediately with:
 ```yaml
@@ -136,7 +136,7 @@ Every top-level key defines a **point** — a named data source to watch. The ke
 
 ### LOG Points — Scheduled Data Snapshots
 
-LOG points read an entity's current state on a cron schedule and write it to `hass-console-logs.csv`.
+LOG points read an entity's current state on a cron schedule and write it to `logs.csv`.
 
 #### Schema
 
@@ -158,6 +158,7 @@ POINT_NAME:
 | `entity` | Yes | The HA entity whose `.state` gets logged. |
 | `category` | No | System type grouping — HVAC, E-METER, GPS, W-METER, UPS, or any string. Shows as a filterable badge in the card. Defaults to empty. |
 | `note` | No | Static text written to the Note column every time this point logs. Defaults to empty. |
+| `target_csv` | No | Route this point's entries to a custom CSV file instead of the default log CSV. See [Custom Target Files](#custom-target-files). |
 
 #### How it works
 
@@ -224,14 +225,17 @@ POINT_NAME:
   note: "Description"                     # Optional — static Note column text
   trigger:                                # Required — list of triggers
     - alias: "Human-readable description" # Optional — shows in Trigger column
-      platform: numeric_state             # Required — only numeric_state supported
+      platform: numeric_state             # Required — numeric_state or state
       entity_id: sensor.some_entity       # Required — entity to monitor
-      above: 78                           # Optional — fire when state > value
-      below: 20                           # Optional — fire when state < value
+      above: 78                           # numeric_state: fire when > value
+      below: 20                           # numeric_state: fire when < value
+      to: "on"                            # state: fire when entity changes to this
+      from: "off"                         # state: only if previous state was this
+      conditions:                         # Optional — AND conditions (all must pass)
+        - entity_id: sensor.humidity
+          above: 60
       for:                                # Optional — sustained duration
-        hours: 0
         minutes: 10
-        seconds: 0
 ```
 
 #### Fields
@@ -243,6 +247,7 @@ POINT_NAME:
 | `category` | No | System type grouping (HVAC, E-METER, etc.). |
 | `entity` | No | The primary entity associated with this alarm. Informational — the actual monitored entity is in the trigger's `entity_id`. |
 | `note` | No | Static text written to the Note column when this alarm fires. |
+| `target_csv` | No | Route this alarm's entries to a custom CSV file instead of the default alarm CSV. Acknowledgment still works across all alarm files. See [Custom Target Files](#custom-target-files). |
 | `trigger` | Yes | List of trigger definitions. Each trigger independently monitors an entity. |
 
 #### Trigger fields
@@ -250,21 +255,111 @@ POINT_NAME:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `alias` | No | Human-friendly name shown in the Trigger column. Make it descriptive. |
-| `platform` | Yes | Only `numeric_state` is supported. |
+| `platform` | Yes | `numeric_state` (threshold) or `state` (exact state match). |
 | `entity_id` | Yes | The entity to monitor for state changes. |
-| `above` | No | Fire when state is strictly greater than this value. |
-| `below` | No | Fire when state is strictly less than this value. At least one of `above`/`below` required. |
-| `for` | No | How long the condition must hold before firing. Prevents nuisance alarms from transient spikes. Omit for immediate firing. |
+| `above` | No | **numeric_state only.** Fire when state is strictly greater than this value. |
+| `below` | No | **numeric_state only.** Fire when state is strictly less than this value. At least one of `above`/`below` required for numeric_state. |
+| `to` | No | **state only.** Fire when entity state matches this value. Accepts a single value or a list. |
+| `from` | No | **state only.** Only fire if the previous state matches. Accepts a single value or a list. |
+| `conditions` | No | List of AND conditions. All must be true simultaneously for the alarm to fire. See [Multi-Condition AND Logic](#multi-condition-and-logic). |
+| `for` | No | How long the condition must hold before firing. Prevents nuisance alarms. Works with both platforms. |
 
 #### How alarm evaluation works
 
 1. The engine subscribes to `state_changed` events on the trigger's `entity_id`.
-2. On each state change, it checks the numeric condition (above/below).
-3. If the condition is met and wasn't before, it starts a timer.
-4. If the condition holds for the `for` duration, it writes an ALARM row (unacknowledged) and marks it recorded.
-5. If the condition clears, the timer resets — ready for the next incident.
+2. On each state change, it checks the primary condition based on the platform:
+   - **numeric_state** — is the value above/below the threshold?
+   - **state** — does the new state match `to`? Was the old state in `from` (if specified)?
+3. If the primary condition passes AND all `conditions` are also true, the alarm condition is considered met.
+4. If the condition was not previously met, it starts a duration timer.
+5. If the condition holds for the `for` duration, it writes an ALARM row (unacknowledged).
+6. If the condition clears, the timer resets — ready for the next incident.
 
 **One alarm per incident.** A sustained 2-hour overheat produces one row, not continuous repeats. When the value drops back below threshold and exceeds it again, that's a new incident.
+
+---
+
+### Multi-Condition AND Logic
+
+Any trigger can include a `conditions` list. The primary trigger must fire AND all conditions must pass simultaneously for the alarm to record. Conditions are checked against the current state of their entity at the moment the primary trigger fires.
+
+#### Condition fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `entity_id` | Required | The entity to check. |
+| `above` | Numeric | Passes if entity state > value. |
+| `below` | Numeric | Passes if entity state < value. |
+| `state` | String/List | Passes if entity state matches (exact). |
+
+Combine `above` and `below` for a range check. Use `state` for exact matches. You can mix trigger platforms with any condition type.
+
+#### Examples
+
+```yaml
+# Numeric trigger + numeric condition (both must be true)
+HOT_AND_HUMID:
+  type: ALARM
+  class: "02"
+  category: HVAC
+  trigger:
+    - alias: "Temp >80 AND humidity >60% for 10 min"
+      platform: numeric_state
+      entity_id: sensor.server_room_temperature
+      above: 80
+      conditions:
+        - entity_id: sensor.server_room_humidity
+          above: 60
+      for:
+        minutes: 10
+
+# State trigger + numeric condition
+DOOR_OPEN_WHILE_HOT:
+  type: ALARM
+  class: "01"
+  category: SECURITY
+  trigger:
+    - alias: "Door opened while temp >85"
+      platform: state
+      entity_id: binary_sensor.server_room_door
+      to: "on"
+      conditions:
+        - entity_id: sensor.server_room_temperature
+          above: 85
+
+# Numeric trigger + state condition
+POWER_HIGH_WHILE_AWAY:
+  type: ALARM
+  class: "02"
+  category: E-METER
+  trigger:
+    - alias: "Above 5kW while nobody home for 15 min"
+      platform: numeric_state
+      entity_id: sensor.main_panel_watts
+      above: 5000
+      conditions:
+        - entity_id: person.steven
+          state: "not_home"
+      for:
+        minutes: 15
+
+# Multiple AND conditions
+CRITICAL_ENVIRONMENT:
+  type: ALARM
+  class: "01"
+  trigger:
+    - alias: "Temp >90 AND humid >70 AND door open"
+      platform: numeric_state
+      entity_id: sensor.rack_temperature
+      above: 90
+      conditions:
+        - entity_id: sensor.rack_humidity
+          above: 70
+        - entity_id: binary_sensor.rack_door
+          state: "on"
+      for:
+        minutes: 5
+```
 
 #### ALARM examples
 
@@ -347,7 +442,103 @@ HUMIDITY_BAND:
       below: 30
       for:
         minutes: 15
+
+# State trigger — garage door left open
+GARAGE_DOOR:
+  type: ALARM
+  class: "02"
+  category: SECURITY
+  entity: binary_sensor.garage_door
+  note: "Garage door left open"
+  trigger:
+    - alias: "Open for 5 min"
+      platform: state
+      entity_id: binary_sensor.garage_door
+      to: "on"
+      for:
+        minutes: 5
+
+# State trigger — specific transition
+WASHER_DONE:
+  type: ALARM
+  class: "03"
+  category: APPLIANCE
+  trigger:
+    - alias: "Washer finished"
+      platform: state
+      entity_id: sensor.washer_status
+      to: "complete"
+      from: "running"
+
+# State trigger — device offline
+SERVER_OFFLINE:
+  type: ALARM
+  class: "01"
+  category: NETWORK
+  trigger:
+    - alias: "Offline for 2 min"
+      platform: state
+      entity_id: binary_sensor.server_ping
+      to: "off"
+      for:
+        minutes: 2
 ```
+
+---
+
+## Custom Target Files
+
+By default, all LOG points write to `logs.csv` and all ALARM points write to `alarms.csv`. The optional `target_csv` field routes a point's entries to a separate file instead — useful for keeping a specific subsystem's data isolated (e.g. all electrical meter readings in their own file for billing reconciliation).
+
+### Path resolution
+
+| `target_csv` value | Resolves to | Accessible at |
+|--------------------|-------------|---------------|
+| `electrical_meters.csv` | `/config/www/hass-console/electrical_meters.csv` | `/local/hass-console/electrical_meters.csv` |
+| `subfolder/meters.csv` | `/config/www/hass-console/subfolder/meters.csv` | `/local/hass-console/subfolder/meters.csv` |
+| `/config/logs/meters.csv` | `/config/logs/meters.csv` | (not web-accessible) |
+
+A bare filename lands next to the default CSVs (in `/config/www/hass-console/`) so it's reachable at a `/local/hass-console/` URL. An absolute path is used as-is.
+
+### Example
+
+```yaml
+# Both of these write to electrical_meters.csv instead of the default log file
+MAIN_PANEL_KWH:
+  type: LOG
+  cron: "0 * * * *"
+  entity: sensor.main_panel_kwh
+  category: E-METER
+  target_csv: electrical_meters.csv
+  note: "Main panel hourly kWh"
+
+SUBPANEL_KWH:
+  type: LOG
+  cron: "0 * * * *"
+  entity: sensor.subpanel_kwh
+  category: E-METER
+  target_csv: electrical_meters.csv
+  note: "Subpanel hourly kWh"
+```
+
+The custom file uses the same schema as the default file for its type (LOG or ALARM columns), is auto-created with headers, and is migrated automatically if the schema changes.
+
+### Custom files and ALARM points
+
+`target_csv` works for ALARM points too. Acknowledgment still works seamlessly — the acknowledge services search across every alarm file in use, so an alarm in `hvac_alarms.csv` can be acknowledged exactly like one in the default file.
+
+### Viewing custom files in the card
+
+The main card shows the default alarm and log CSVs. To view a custom file, add a second card instance pointing at it:
+
+```yaml
+type: custom:hass-console-card
+title: Electrical Meters
+log_csv: /local/hass-console/electrical_meters.csv
+alarm_csv: /local/hass-console/alarms.csv
+```
+
+The card always renders both tabs, so set `log_csv` (or `alarm_csv`) to your custom file and leave the other pointing at a default.
 
 ---
 
@@ -399,7 +590,7 @@ The `ack` column is empty for unacknowledged alarms and contains the acknowledgm
 
 Two separate CSV files in `/config/www/`, accessible at `/local/` URLs:
 
-### hass-console-alarms.csv
+### alarms.csv
 
 ```
 id, timestamp, category, entity, class, value, duration, note, trigger, ack
@@ -418,7 +609,7 @@ id, timestamp, category, entity, class, value, duration, note, trigger, ack
 | trigger | Alias of the trigger that fired |
 | ack | Empty = unacknowledged, timestamp = when acknowledged |
 
-### hass-console-logs.csv
+### logs.csv
 
 ```
 timestamp, category, entity, value, note
@@ -445,19 +636,29 @@ On every startup, the engine checks existing CSV headers against the current sch
 ```yaml
 type: custom:hass-console-card
 title: HASS Console
-alarm_csv: /local/hass-console-alarms.csv
-log_csv: /local/hass-console-logs.csv
+alarm_csv: /local/hass-console/alarms.csv
+log_csv: /local/hass-console/logs.csv
 rows: 200
 refresh_interval: 30
+theme: auto
 ```
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `title` | HASS Console | Card header text |
-| `alarm_csv` | `/local/hass-console-alarms.csv` | URL to alarm CSV |
-| `log_csv` | `/local/hass-console-logs.csv` | URL to log CSV |
+| `alarm_csv` | `/local/hass-console/alarms.csv` | URL to alarm CSV |
+| `log_csv` | `/local/hass-console/logs.csv` | URL to log CSV |
 | `rows` | 200 | Max rows to display per tab |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
+| `theme` | auto | `auto` (follows HA theme), `dark`, or `light` |
+
+### Theme Support
+
+The card adapts to Home Assistant's active theme. In `auto` mode, it reads HA's background color to determine light or dark, then sets all colors, backgrounds, and borders to match. Alarm severity colors (red/amber/blue) stay fixed in both modes for visual consistency.
+
+- **`auto`** — detects HA's current theme. If you switch between light and dark in HA, the card follows.
+- **`dark`** — forces the dark console look regardless of HA theme. The original HASS Console aesthetic.
+- **`light`** — forces light mode. Clean white background with dark text.
 
 ### Features
 
@@ -486,6 +687,54 @@ All filters stack — class + category + entity + date range + text search.
 
 ---
 
+## Summary Card
+
+A compact at-a-glance widget for overview dashboards. Shows alarm counts by severity, acknowledgment status, and a 7-day alarm trend sparkline.
+
+### Setup
+
+Register as a second resource: **Settings → Dashboards → Resources → Add Resource**
+
+| Field | Value |
+|-------|-------|
+| URL   | `/local/hass-console-summary-card.js` |
+| Type  | JavaScript Module |
+
+### Configuration
+
+```yaml
+type: custom:hass-console-summary-card
+title: Console Status
+alarm_csv: /local/hass-console/alarms.csv
+log_csv: /local/hass-console/logs.csv
+refresh_interval: 30
+theme: auto
+show_trend: true
+show_log_count: true
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `title` | Console Status | Card header text |
+| `alarm_csv` | `/local/hass-console/alarms.csv` | URL to alarm CSV |
+| `log_csv` | `/local/hass-console/logs.csv` | URL to log CSV |
+| `refresh_interval` | 30 | Seconds between auto-refresh |
+| `theme` | auto | `auto`, `dark`, or `light` |
+| `show_trend` | true | Show the 7-day alarm trend sparkline |
+| `show_log_count` | true | Show total log entry count in stats |
+
+### What it shows
+
+**Status indicator** — a glowing dot and label that reflects the highest active severity: CRITICAL (red, blinking), ATTENTION (amber), MINOR (blue), or ALL CLEAR (green). Determined by unacknowledged alarms only.
+
+**Severity gauges** — large numbers for Critical, Major, and Minor unacknowledged alarm counts. An "Other" gauge appears if you use custom class values beyond 01/02/03.
+
+**Stats row** — unacknowledged count, acknowledged count, total alarms, and total log entries.
+
+**7-day alarm trend** — a sparkline bar chart showing alarm volume per day for the last week. Bar color scales from green (low) to amber to red (high). Hover a bar to see the exact date and count. Useful for spotting patterns — are alarms increasing? Did something change on Tuesday?
+
+---
+
 ## Services
 
 ### hass_console.write_log
@@ -507,6 +756,7 @@ data:
 | category | No | System type |
 | value | No | Value to record |
 | note | No | Description |
+| target_csv | No | Custom CSV filename or absolute path |
 
 ### hass_console.write_alarm
 
@@ -532,6 +782,7 @@ data:
 | duration | No | Duration string |
 | note | No | Description |
 | trigger | No | What caused the alarm |
+| target_csv | No | Custom CSV filename or absolute path |
 
 ### hass_console.acknowledge_alarm
 

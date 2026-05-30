@@ -7,10 +7,10 @@ CONF_CONSOLE_YAML = "console_yaml"
 CONF_ALARM_CSV = "alarm_csv"
 CONF_LOG_CSV = "log_csv"
 
-# Defaults
+# Defaults — all CSVs live in /config/www/hass-console/
 DEFAULT_CONSOLE_YAML = "/config/console.yaml"
-DEFAULT_ALARM_CSV = "/config/www/hass-console-alarms.csv"
-DEFAULT_LOG_CSV = "/config/www/hass-console-logs.csv"
+DEFAULT_ALARM_CSV = "/config/www/hass-console/alarms.csv"
+DEFAULT_LOG_CSV = "/config/www/hass-console/logs.csv"
 
 # CSV column schemas
 ALARM_COLUMNS = [
@@ -34,3 +34,4 @@ CONF_NOTE = "note"
 CONF_CLASS = "class"
 CONF_TRIGGER = "trigger"
 CONF_CATEGORY = "category"
+CONF_TARGET_CSV = "target_csv"
