@@ -1,13 +1,13 @@
 {
   "domain": "hass_console",
   "name": "HASS Console - Alarm & Log Engine",
-  "documentation": "https://github.com/Steven-D-Morgan/hass-console",
-  "issue_tracker": "https://github.com/Steven-D-Morgan/hass-console/issues",
-  "version": "2.5.0",
-  "config_flow": true,
   "codeowners": ["@Steven-D-Morgan"],
+  "config_flow": true,
   "dependencies": [],
-  "iot_class": "local_push",
+  "documentation": "https://github.com/Steven-D-Morgan/hass-console",
   "integration_type": "service",
-  "requirements": []
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Steven-D-Morgan/hass-console/issues",
+  "requirements": [],
+  "version": "2.5.0"
 }
