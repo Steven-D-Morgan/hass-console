@@ -142,6 +142,8 @@ class HassConsoleEngine:
         await self.hass.async_add_executor_job(self._ensure_csvs)
         await self._setup_cron_scanner()
         self._setup_alarm_listeners()
+        self._initial_alarm_eval()
+        self._setup_alarm_duration_checker()
         _LOGGER.info(
             "HASS Console started: %d points, %d log file(s), %d alarm file(s)",
             len(self.points), len(self._log_files), len(self._alarm_files),
@@ -298,6 +300,111 @@ class HassConsoleEngine:
                 self._unsub_listeners.append(
                     async_track_state_change_event(self.hass, target, _changed)
                 )
+
+    @callback
+    def _initial_alarm_eval(self) -> None:
+        """Check current state of all alarm entities on startup.
+
+        If an entity is already in an alarm condition when the engine
+        starts (e.g. door was already open), start the duration timer
+        immediately so the alarm fires after the configured 'for' period.
+        Without this, the engine would miss alarm conditions that existed
+        before startup.
+        """
+        now = dt_util.now()
+        for key, a in self._alarm_states.items():
+            entity_id = a["entity_id"]
+            state_obj = self.hass.states.get(entity_id)
+            if not state_obj or state_obj.state in ("unavailable", "unknown"):
+                continue
+
+            platform = a["platform"]
+            primary_ok = False
+
+            if platform == PLATFORM_NUMERIC:
+                primary_ok = _check_numeric(state_obj.state, a["above"], a["below"])
+            elif platform == PLATFORM_STATE:
+                to_val = a["to_state"]
+                if to_val is not None:
+                    to_list = to_val if isinstance(to_val, list) else [str(to_val)]
+                    primary_ok = state_obj.state in [str(v) for v in to_list]
+                else:
+                    primary_ok = True
+
+            # Check AND conditions
+            if primary_ok and a["conditions"]:
+                for cond in a["conditions"]:
+                    if not self._check_condition(cond):
+                        primary_ok = False
+                        break
+
+            if primary_ok:
+                a["active"] = True
+                a["triggered_at"] = now
+                a["recorded"] = False
+                _LOGGER.debug(
+                    "Initial eval: %s already in alarm condition (%s=%s), timer started",
+                    key, entity_id, state_obj.state,
+                )
+
+    def _setup_alarm_duration_checker(self) -> None:
+        """Run every 30 seconds to check if any active alarm has exceeded its duration.
+
+        This is needed because state triggers (e.g. door open) don't fire
+        repeated events while the entity sits in the same state. Without
+        this checker, the 'for' duration would never be evaluated for
+        entities that don't change state frequently.
+        """
+        @callback
+        def _check_durations(now):
+            for key, a in self._alarm_states.items():
+                if not a["active"] or a["recorded"]:
+                    continue
+                elapsed = (now - a["triggered_at"]).total_seconds()
+                if elapsed >= a["duration"]:
+                    # Re-verify the condition is still true
+                    entity_id = a["entity_id"]
+                    state_obj = self.hass.states.get(entity_id)
+                    if not state_obj or state_obj.state in ("unavailable", "unknown"):
+                        a["active"] = False
+                        a["triggered_at"] = None
+                        continue
+
+                    still_ok = False
+                    if a["platform"] == PLATFORM_NUMERIC:
+                        still_ok = _check_numeric(state_obj.state, a["above"], a["below"])
+                        display_val = state_obj.state
+                    elif a["platform"] == PLATFORM_STATE:
+                        to_val = a["to_state"]
+                        if to_val is not None:
+                            to_list = to_val if isinstance(to_val, list) else [str(to_val)]
+                            still_ok = state_obj.state in [str(v) for v in to_list]
+                        else:
+                            still_ok = True
+                        display_val = state_obj.state
+
+                    # Re-check AND conditions
+                    if still_ok and a["conditions"]:
+                        for cond in a["conditions"]:
+                            if not self._check_condition(cond):
+                                still_ok = False
+                                break
+
+                    if still_ok:
+                        self.hass.async_create_task(
+                            self._record_alarm(
+                                a["point"], now, display_val, elapsed, a["alias"]
+                            )
+                        )
+                        a["recorded"] = True
+                    else:
+                        # Condition cleared between checks
+                        a["active"] = False
+                        a["triggered_at"] = None
+
+        self._unsub_listeners.append(
+            async_track_time_interval(self.hass, _check_durations, timedelta(seconds=30))
+        )
 
     async def _eval_alarm(self, key, event):
         a = self._alarm_states.get(key)
