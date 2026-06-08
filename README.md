@@ -641,6 +641,8 @@ log_csv: /local/hass-console/logs.csv
 rows: 200
 refresh_interval: 30
 theme: auto
+show_alarm: true
+show_log: true
 ```
 
 | Key | Default | Description |
@@ -651,6 +653,8 @@ theme: auto
 | `rows` | 200 | Max rows to display per tab |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
 | `theme` | auto | `auto` (follows HA theme), `dark`, or `light` |
+| `show_alarm` | true | Set to `false` to hide the Alarm tab |
+| `show_log` | true | Set to `false` to hide the Log tab |
 
 ### Theme Support
 
@@ -659,6 +663,23 @@ The card adapts to Home Assistant's active theme. In `auto` mode, it reads HA's 
 - **`auto`** — detects HA's current theme. If you switch between light and dark in HA, the card follows.
 - **`dark`** — forces the dark console look regardless of HA theme. The original HASS Console aesthetic.
 - **`light`** — forces light mode. Clean white background with dark text.
+
+### Show/Hide Tabs
+
+Use `show_alarm: false` or `show_log: false` to create single-purpose card instances. When only one tab is enabled, the tab bar hides entirely for a cleaner view.
+
+```yaml
+# Alarm-only view
+type: custom:hass-console-card
+title: Alarms Only
+show_log: false
+
+# Log-only view for a custom target CSV
+type: custom:hass-console-card
+title: Electrical Meters
+show_alarm: false
+log_csv: /local/hass-console/electrical_meters.csv
+```
 
 ### Features
 

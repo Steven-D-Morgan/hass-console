@@ -1,5 +1,5 @@
 /**
- * HASS Console Card v2.5.0
+ * HASS Console Card v2.5.2
  *
  * CONFIG:
  *   type: custom:hass-console-card
@@ -9,15 +9,24 @@
  *   rows: 200
  *   refresh_interval: 30
  *   theme: auto          # auto | dark | light
+ *   show_alarm: true     # show the Alarm tab (default true)
+ *   show_log: true       # show the Log tab (default true)
  */
-const VER="2.5.0";
+const VER="2.5.2";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
 constructor(){super();this.attachShadow({mode:"open"});this._c={};this._alarm=[];this._log=[];this._tab="ALARM";this._timer=null;this._sortCol=null;this._sortDir="desc";
 this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto"}
 
-setConfig(c){this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30};this._theme=c.theme||"auto"}
+setConfig(c){
+this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30,
+showAlarm:c.show_alarm!==false,showLog:c.show_log!==false};
+this._theme=c.theme||"auto";
+// Default to whichever tab is enabled
+if(!this._c.showAlarm&&this._c.showLog)this._tab="LOG";
+if(this._c.showAlarm&&!this._c.showLog)this._tab="ALARM";
+}
 
 set hass(h){this._hass=h;if(!this._init){this._init=true;this._render();this._fetch();this._startRefresh()}}
 
@@ -30,7 +39,10 @@ const lum=(parseInt(m[0])*299+parseInt(m[1])*587+parseInt(m[2])*114)/1000;
 return lum<128}
 
 _startRefresh(){if(this._timer)clearInterval(this._timer);this._timer=setInterval(()=>this._fetch(),this._c.refresh*1000)}
-async _fetch(){await Promise.all([this._fetchOne("alarm"),this._fetchOne("log")]);this._update()}
+async _fetch(){await Promise.all([
+this._c.showAlarm?this._fetchOne("alarm"):Promise.resolve(),
+this._c.showLog?this._fetchOne("log"):Promise.resolve()
+]);this._update()}
 async _fetchOne(t){try{const u=t==="alarm"?this._c.alarm_csv:this._c.log_csv;const r=await fetch(u+`?_=${Date.now()}`);if(!r.ok){if(t==="alarm")this._alarm=[];else this._log=[];return}
 const rows=this._parseCSV(await r.text());if(t==="alarm")this._alarm=rows;else this._log=rows}catch(e){console.error("HASS Console:",e)}}
 
@@ -164,6 +176,8 @@ this.shadowRoot.getElementById("filterToggle").addEventListener("click",()=>{thi
 this._renderTabs()}
 
 _renderTabs(){const c=this.shadowRoot.getElementById("tabs");const unack=this._unackCount();
+const both=this._c.showAlarm&&this._c.showLog;
+if(!both){c.innerHTML="";return}
 c.innerHTML=`<button class="tbtn ${this._tab==="ALARM"?"active":""}" data-t="ALARM">Alarm <span class="badge badge-unack">${unack}</span></button>
 <button class="tbtn ${this._tab==="LOG"?"active":""}" data-t="LOG">Log <span class="badge">${this._log.length}</span></button>`;
 c.querySelectorAll(".tbtn").forEach(b=>b.addEventListener("click",()=>{
@@ -253,7 +267,7 @@ return this._esc(v)}
 _esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
 getCardSize(){return 8}
 disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
-static getStubConfig(){return{title:"HASS Console",alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30}}
+static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30}}
 }
 
 customElements.define("hass-console-card",HassConsoleCard);

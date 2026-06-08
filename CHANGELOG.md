@@ -13,8 +13,19 @@ All notable changes to this project are documented here, newest first. Versions 
 - **Initial alarm evaluation** — engine now checks the current state of all alarm entities immediately at startup. If an entity is already in an alarm condition (e.g. garage door was already open when HA restarted), the duration timer starts immediately instead of waiting for a state change event.
 - **Periodic duration checker** — new 30-second interval timer evaluates all active alarm timers, re-verifies conditions are still met, and fires alarms that have exceeded their `for:` duration. Fixes the case where an entity sits in the same state (like a door stuck at `open`) and generates no state change events.
 
+### ✨ Card: Show/Hide Tabs
+
+New `show_alarm` and `show_log` config options. Set either to `false` to hide that tab entirely:
+```yaml
+type: custom:hass-console-card
+show_alarm: false    # log-only view
+show_log: true
+```
+When only one tab is enabled, the tab bar is hidden and the card shows just that view. Useful for dedicated alarm-only or log-only card instances pointing at custom target CSVs.
+
 ### Changed
-- `__init__.py` — added `_initial_alarm_eval()` and `_setup_alarm_duration_checker()` methods
+- `__init__.py` — added `_initial_alarm_eval()` and `_setup_alarm_duration_checker()`
+- `hass-console-card.js` — `show_alarm`/`show_log` config, tab bar hidden when single tab
 
 ---
 
