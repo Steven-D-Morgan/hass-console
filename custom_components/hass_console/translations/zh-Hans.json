@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "设置 HASS Console",
+        "description": "告诉 HASS Console 在哪里查找你的 console.yaml，以及将 CSV 日志文件写入何处。console.yaml 文件必须已存在 — 格式请参阅 README。CSV 文件将在首次运行时自动创建。",
+        "data": {
+          "console_yaml": "Console YAML 路径",
+          "alarm_csv": "报警 CSV 输出路径",
+          "log_csv": "日志 CSV 输出路径",
+          "retention_days": "保留（天数，0 = 永久保留）",
+          "max_rows": "每个文件最大行数（0 = 无限制）"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "必须提供 Console YAML 路径",
+      "yaml_not_found": "在指定路径未找到 Console YAML 文件",
+      "path_required": "必须提供路径",
+      "parent_not_writable": "父目录不存在且无法创建"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console 已配置。仅支持一个实例。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HASS Console 设置",
+        "description": "更改文件路径和保留设置。更改立即生效 — 无需重启。",
+        "data": {
+          "console_yaml": "Console YAML 路径",
+          "alarm_csv": "报警 CSV 输出路径",
+          "log_csv": "日志 CSV 输出路径",
+          "retention_days": "保留（天数，0 = 永久保留）",
+          "max_rows": "每个文件最大行数（0 = 无限制）"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "必须提供 Console YAML 路径",
+      "yaml_not_found": "在指定路径未找到 Console YAML 文件",
+      "path_required": "必须提供路径",
+      "parent_not_writable": "父目录不存在且无法创建"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console：{count} 个无效的配置项",
+      "description": "你的 console.yaml 中的某些配置项被跳过或不完整，将无法按预期工作：\n\n{problems}\n\n请在 console.yaml 中修正它们，然后重新加载 HASS Console（集成菜单 → 重新加载，或使用 hass_console.reload 服务）。"
+    }
+  }
+}

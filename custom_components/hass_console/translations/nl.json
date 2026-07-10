@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "HASS Console instellen",
+        "description": "Vertel HASS Console waar je console.yaml te vinden is en waar de CSV-logbestanden moeten worden weggeschreven. Het bestand console.yaml moet al bestaan — zie de README voor het formaat. De CSV-bestanden worden automatisch aangemaakt bij de eerste start.",
+        "data": {
+          "console_yaml": "Pad naar Console-YAML",
+          "alarm_csv": "Uitvoerpad voor alarm-CSV",
+          "log_csv": "Uitvoerpad voor log-CSV",
+          "retention_days": "Bewaartermijn (dagen, 0 = voor altijd bewaren)",
+          "max_rows": "Maximaal aantal rijen per bestand (0 = onbeperkt)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Pad naar Console-YAML is vereist",
+      "yaml_not_found": "Console-YAML-bestand niet gevonden op het opgegeven pad",
+      "path_required": "Pad is vereist",
+      "parent_not_writable": "Bovenliggende map bestaat niet en kon niet worden aangemaakt"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console is al geconfigureerd. Er wordt slechts één instantie ondersteund."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HASS Console-instellingen",
+        "description": "Wijzig bestandspaden en bewaartermijn. Wijzigingen worden onmiddellijk toegepast — geen herstart nodig.",
+        "data": {
+          "console_yaml": "Pad naar Console-YAML",
+          "alarm_csv": "Uitvoerpad voor alarm-CSV",
+          "log_csv": "Uitvoerpad voor log-CSV",
+          "retention_days": "Bewaartermijn (dagen, 0 = voor altijd bewaren)",
+          "max_rows": "Maximaal aantal rijen per bestand (0 = onbeperkt)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Pad naar Console-YAML is vereist",
+      "yaml_not_found": "Console-YAML-bestand niet gevonden op het opgegeven pad",
+      "path_required": "Pad is vereist",
+      "parent_not_writable": "Bovenliggende map bestaat niet en kon niet worden aangemaakt"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} ongeldige configuratiepunt(en)",
+      "description": "Sommige punten in je console.yaml zijn overgeslagen of onvolledig en werken niet zoals verwacht:\n\n{problems}\n\nCorrigeer ze in console.yaml en herlaad daarna HASS Console (integratiemenu → Herladen, of de service hass_console.reload)."
+    }
+  }
+}

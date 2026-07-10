@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "HASS Console einrichten",
+        "description": "Teile HASS Console mit, wo sich deine console.yaml befindet und wohin die CSV-Protokolldateien geschrieben werden sollen. Die Datei console.yaml muss bereits existieren — das Format findest du in der README. Die CSV-Dateien werden beim ersten Start automatisch erstellt.",
+        "data": {
+          "console_yaml": "Pfad zur Console-YAML",
+          "alarm_csv": "Ausgabepfad für Alarm-CSV",
+          "log_csv": "Ausgabepfad für Protokoll-CSV",
+          "retention_days": "Aufbewahrung (Tage, 0 = für immer behalten)",
+          "max_rows": "Maximale Zeilen pro Datei (0 = unbegrenzt)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Pfad zur Console-YAML ist erforderlich",
+      "yaml_not_found": "Console-YAML-Datei unter dem angegebenen Pfad nicht gefunden",
+      "path_required": "Pfad ist erforderlich",
+      "parent_not_writable": "Übergeordnetes Verzeichnis existiert nicht und konnte nicht erstellt werden"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console ist bereits konfiguriert. Es wird nur eine einzige Instanz unterstützt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HASS Console Einstellungen",
+        "description": "Dateipfade und Aufbewahrung ändern. Änderungen werden sofort wirksam — kein Neustart erforderlich.",
+        "data": {
+          "console_yaml": "Pfad zur Console-YAML",
+          "alarm_csv": "Ausgabepfad für Alarm-CSV",
+          "log_csv": "Ausgabepfad für Protokoll-CSV",
+          "retention_days": "Aufbewahrung (Tage, 0 = für immer behalten)",
+          "max_rows": "Maximale Zeilen pro Datei (0 = unbegrenzt)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Pfad zur Console-YAML ist erforderlich",
+      "yaml_not_found": "Console-YAML-Datei unter dem angegebenen Pfad nicht gefunden",
+      "path_required": "Pfad ist erforderlich",
+      "parent_not_writable": "Übergeordnetes Verzeichnis existiert nicht und konnte nicht erstellt werden"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} ungültige Konfigurationspunkte",
+      "description": "Einige Punkte in deiner console.yaml wurden übersprungen oder sind unvollständig und funktionieren nicht wie erwartet:\n\n{problems}\n\nKorrigiere sie in der console.yaml und lade HASS Console anschließend neu (Integrationsmenü → Neu laden oder den Dienst hass_console.reload)."
+    }
+  }
+}

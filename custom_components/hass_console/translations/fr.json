@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurer HASS Console",
+        "description": "Indiquez à HASS Console où trouver votre console.yaml et où écrire les fichiers journaux CSV. Le fichier console.yaml doit déjà exister — consultez le README pour le format. Les fichiers CSV seront créés automatiquement au premier démarrage.",
+        "data": {
+          "console_yaml": "Chemin du YAML de Console",
+          "alarm_csv": "Chemin de sortie du CSV d'alarmes",
+          "log_csv": "Chemin de sortie du CSV de journal",
+          "retention_days": "Rétention (jours, 0 = conserver indéfiniment)",
+          "max_rows": "Nombre maximal de lignes par fichier (0 = illimité)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Le chemin du YAML de Console est requis",
+      "yaml_not_found": "Fichier YAML de Console introuvable au chemin indiqué",
+      "path_required": "Le chemin est requis",
+      "parent_not_writable": "Le répertoire parent n'existe pas et n'a pas pu être créé"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console est déjà configuré. Une seule instance est prise en charge."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paramètres de HASS Console",
+        "description": "Modifiez les chemins de fichiers et la rétention. Les modifications s'appliquent immédiatement — aucun redémarrage nécessaire.",
+        "data": {
+          "console_yaml": "Chemin du YAML de Console",
+          "alarm_csv": "Chemin de sortie du CSV d'alarmes",
+          "log_csv": "Chemin de sortie du CSV de journal",
+          "retention_days": "Rétention (jours, 0 = conserver indéfiniment)",
+          "max_rows": "Nombre maximal de lignes par fichier (0 = illimité)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Le chemin du YAML de Console est requis",
+      "yaml_not_found": "Fichier YAML de Console introuvable au chemin indiqué",
+      "path_required": "Le chemin est requis",
+      "parent_not_writable": "Le répertoire parent n'existe pas et n'a pas pu être créé"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console : {count} point(s) de configuration invalide(s)",
+      "description": "Certains points de votre console.yaml ont été ignorés ou sont incomplets et ne fonctionneront pas comme prévu :\n\n{problems}\n\nCorrigez-les dans console.yaml, puis rechargez HASS Console (menu de l'intégration → Recharger, ou le service hass_console.reload)."
+    }
+  }
+}

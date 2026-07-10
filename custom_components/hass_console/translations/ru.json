@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Настройка HASS Console",
+        "description": "Укажите HASS Console, где находится ваш файл console.yaml и куда записывать файлы журналов CSV. Файл console.yaml должен уже существовать — формат см. в README. Файлы CSV будут созданы автоматически при первом запуске.",
+        "data": {
+          "console_yaml": "Путь к файлу Console YAML",
+          "alarm_csv": "Путь вывода CSV тревог",
+          "log_csv": "Путь вывода CSV журнала",
+          "retention_days": "Хранение (дней, 0 = хранить всегда)",
+          "max_rows": "Максимум строк на файл (0 = без ограничений)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Путь к файлу Console YAML обязателен",
+      "yaml_not_found": "Файл Console YAML не найден по указанному пути",
+      "path_required": "Путь обязателен",
+      "parent_not_writable": "Родительский каталог не существует и не может быть создан"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console уже настроена. Поддерживается только один экземпляр."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки HASS Console",
+        "description": "Измените пути к файлам и параметры хранения. Изменения применяются немедленно — перезапуск не требуется.",
+        "data": {
+          "console_yaml": "Путь к файлу Console YAML",
+          "alarm_csv": "Путь вывода CSV тревог",
+          "log_csv": "Путь вывода CSV журнала",
+          "retention_days": "Хранение (дней, 0 = хранить всегда)",
+          "max_rows": "Максимум строк на файл (0 = без ограничений)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Путь к файлу Console YAML обязателен",
+      "yaml_not_found": "Файл Console YAML не найден по указанному пути",
+      "path_required": "Путь обязателен",
+      "parent_not_writable": "Родительский каталог не существует и не может быть создан"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} недопустимых точек конфигурации",
+      "description": "Некоторые точки в вашем файле console.yaml были пропущены или неполны и не будут работать должным образом:\n\n{problems}\n\nИсправьте их в console.yaml, затем перезагрузите HASS Console (меню интеграции → Перезагрузить или служба hass_console.reload)."
+    }
+  }
+}

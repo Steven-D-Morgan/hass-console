@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfigurera HASS Console",
+        "description": "Tala om för HASS Console var din console.yaml finns och vart CSV-loggfilerna ska skrivas. Filen console.yaml måste redan finnas — se README för formatet. CSV-filerna skapas automatiskt vid första starten.",
+        "data": {
+          "console_yaml": "Sökväg till Console-YAML",
+          "alarm_csv": "Utdatasökväg för larm-CSV",
+          "log_csv": "Utdatasökväg för logg-CSV",
+          "retention_days": "Lagring (dagar, 0 = behåll för alltid)",
+          "max_rows": "Max antal rader per fil (0 = obegränsat)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Sökväg till Console-YAML krävs",
+      "yaml_not_found": "Console-YAML-filen hittades inte på den angivna sökvägen",
+      "path_required": "Sökväg krävs",
+      "parent_not_writable": "Överordnad katalog finns inte och kunde inte skapas"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console är redan konfigurerad. Endast en instans stöds."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HASS Console-inställningar",
+        "description": "Ändra filsökvägar och lagring. Ändringar tillämpas omedelbart — ingen omstart behövs.",
+        "data": {
+          "console_yaml": "Sökväg till Console-YAML",
+          "alarm_csv": "Utdatasökväg för larm-CSV",
+          "log_csv": "Utdatasökväg för logg-CSV",
+          "retention_days": "Lagring (dagar, 0 = behåll för alltid)",
+          "max_rows": "Max antal rader per fil (0 = obegränsat)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Sökväg till Console-YAML krävs",
+      "yaml_not_found": "Console-YAML-filen hittades inte på den angivna sökvägen",
+      "path_required": "Sökväg krävs",
+      "parent_not_writable": "Överordnad katalog finns inte och kunde inte skapas"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} ogiltiga konfigurationspunkter",
+      "description": "Vissa punkter i din console.yaml hoppades över eller är ofullständiga och kommer inte att fungera som förväntat:\n\n{problems}\n\nRätta dem i console.yaml och läs sedan om HASS Console (integrationsmenyn → Läs om, eller tjänsten hass_console.reload)."
+    }
+  }
+}

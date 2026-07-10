@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nastavit HASS Console",
+        "description": "Řekněte HASS Console, kde najít váš soubor console.yaml a kam zapisovat protokolové soubory CSV. Soubor console.yaml už musí existovat — formát najdete v souboru README. Soubory CSV se vytvoří automaticky při prvním spuštění.",
+        "data": {
+          "console_yaml": "Cesta k souboru Console YAML",
+          "alarm_csv": "Výstupní cesta CSV alarmů",
+          "log_csv": "Výstupní cesta CSV protokolu",
+          "retention_days": "Uchovávání (dny, 0 = uchovávat navždy)",
+          "max_rows": "Maximální počet řádků na soubor (0 = bez omezení)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Cesta k souboru Console YAML je povinná",
+      "yaml_not_found": "Soubor Console YAML nebyl na zadané cestě nalezen",
+      "path_required": "Cesta je povinná",
+      "parent_not_writable": "Nadřazený adresář neexistuje a nepodařilo se jej vytvořit"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console je již nakonfigurována. Je podporována pouze jedna instance."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nastavení HASS Console",
+        "description": "Změňte cesty k souborům a uchovávání. Změny se projeví okamžitě — není nutný restart.",
+        "data": {
+          "console_yaml": "Cesta k souboru Console YAML",
+          "alarm_csv": "Výstupní cesta CSV alarmů",
+          "log_csv": "Výstupní cesta CSV protokolu",
+          "retention_days": "Uchovávání (dny, 0 = uchovávat navždy)",
+          "max_rows": "Maximální počet řádků na soubor (0 = bez omezení)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Cesta k souboru Console YAML je povinná",
+      "yaml_not_found": "Soubor Console YAML nebyl na zadané cestě nalezen",
+      "path_required": "Cesta je povinná",
+      "parent_not_writable": "Nadřazený adresář neexistuje a nepodařilo se jej vytvořit"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} neplatných konfiguračních bodů",
+      "description": "Některé body ve vašem souboru console.yaml byly přeskočeny nebo jsou neúplné a nebudou fungovat podle očekávání:\n\n{problems}\n\nOpravte je v souboru console.yaml a poté znovu načtěte HASS Console (nabídka integrace → Znovu načíst, nebo služba hass_console.reload)."
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configura HASS Console",
+        "description": "Indica a HASS Console dove trovare il tuo console.yaml e dove scrivere i file di log CSV. Il file console.yaml deve già esistere — consulta il README per il formato. I file CSV verranno creati automaticamente al primo avvio.",
+        "data": {
+          "console_yaml": "Percorso dello YAML di Console",
+          "alarm_csv": "Percorso di output del CSV degli allarmi",
+          "log_csv": "Percorso di output del CSV di log",
+          "retention_days": "Conservazione (giorni, 0 = conserva per sempre)",
+          "max_rows": "Righe massime per file (0 = illimitato)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Il percorso dello YAML di Console è obbligatorio",
+      "yaml_not_found": "File YAML di Console non trovato nel percorso indicato",
+      "path_required": "Il percorso è obbligatorio",
+      "parent_not_writable": "La directory principale non esiste e non è stato possibile crearla"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console è già configurato. È supportata una sola istanza."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Impostazioni di HASS Console",
+        "description": "Modifica i percorsi dei file e la conservazione. Le modifiche vengono applicate immediatamente — nessun riavvio necessario.",
+        "data": {
+          "console_yaml": "Percorso dello YAML di Console",
+          "alarm_csv": "Percorso di output del CSV degli allarmi",
+          "log_csv": "Percorso di output del CSV di log",
+          "retention_days": "Conservazione (giorni, 0 = conserva per sempre)",
+          "max_rows": "Righe massime per file (0 = illimitato)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Il percorso dello YAML di Console è obbligatorio",
+      "yaml_not_found": "File YAML di Console non trovato nel percorso indicato",
+      "path_required": "Il percorso è obbligatorio",
+      "parent_not_writable": "La directory principale non esiste e non è stato possibile crearla"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} punto/i di configurazione non valido/i",
+      "description": "Alcuni punti nel tuo console.yaml sono stati saltati o sono incompleti e non funzioneranno come previsto:\n\n{problems}\n\nCorreggili in console.yaml, quindi ricarica HASS Console (menu dell'integrazione → Ricarica, o il servizio hass_console.reload)."
+    }
+  }
+}

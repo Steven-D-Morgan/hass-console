@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfigurer HASS Console",
+        "description": "Fortell HASS Console hvor den finner console.yaml og hvor CSV-loggfilene skal skrives. Filen console.yaml må allerede finnes — se README for formatet. CSV-filene opprettes automatisk ved første oppstart.",
+        "data": {
+          "console_yaml": "Bane til Console-YAML",
+          "alarm_csv": "Utdatabane for alarm-CSV",
+          "log_csv": "Utdatabane for logg-CSV",
+          "retention_days": "Oppbevaring (dager, 0 = behold for alltid)",
+          "max_rows": "Maks antall rader per fil (0 = ubegrenset)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Bane til Console-YAML er påkrevd",
+      "yaml_not_found": "Fant ikke Console-YAML-filen på den angitte banen",
+      "path_required": "Bane er påkrevd",
+      "parent_not_writable": "Overordnet mappe finnes ikke og kunne ikke opprettes"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console er allerede konfigurert. Bare én instans støttes."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HASS Console-innstillinger",
+        "description": "Endre filbaner og oppbevaring. Endringer trer i kraft umiddelbart — ingen omstart nødvendig.",
+        "data": {
+          "console_yaml": "Bane til Console-YAML",
+          "alarm_csv": "Utdatabane for alarm-CSV",
+          "log_csv": "Utdatabane for logg-CSV",
+          "retention_days": "Oppbevaring (dager, 0 = behold for alltid)",
+          "max_rows": "Maks antall rader per fil (0 = ubegrenset)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Bane til Console-YAML er påkrevd",
+      "yaml_not_found": "Fant ikke Console-YAML-filen på den angitte banen",
+      "path_required": "Bane er påkrevd",
+      "parent_not_writable": "Overordnet mappe finnes ikke og kunne ikke opprettes"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} ugyldige konfigurasjonspunkter",
+      "description": "Noen punkter i din console.yaml ble hoppet over eller er ufullstendige og vil ikke fungere som forventet:\n\n{problems}\n\nRett dem i console.yaml, og last deretter HASS Console på nytt (integrasjonsmenyen → Last inn på nytt, eller tjenesten hass_console.reload)."
+    }
+  }
+}

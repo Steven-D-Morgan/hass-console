@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar HASS Console",
+        "description": "Indica a HASS Console dónde encontrar tu console.yaml y dónde escribir los archivos CSV de registro. El archivo console.yaml ya debe existir — consulta el README para ver el formato. Los archivos CSV se crearán automáticamente en el primer inicio.",
+        "data": {
+          "console_yaml": "Ruta del YAML de Console",
+          "alarm_csv": "Ruta de salida del CSV de alarmas",
+          "log_csv": "Ruta de salida del CSV de registro",
+          "retention_days": "Retención (días, 0 = conservar para siempre)",
+          "max_rows": "Máximo de filas por archivo (0 = sin límite)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "La ruta del YAML de Console es obligatoria",
+      "yaml_not_found": "No se encontró el archivo YAML de Console en la ruta indicada",
+      "path_required": "La ruta es obligatoria",
+      "parent_not_writable": "El directorio principal no existe y no se pudo crear"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console ya está configurado. Solo se admite una instancia."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ajustes de HASS Console",
+        "description": "Cambia las rutas de archivo y la retención. Los cambios se aplican de inmediato — no es necesario reiniciar.",
+        "data": {
+          "console_yaml": "Ruta del YAML de Console",
+          "alarm_csv": "Ruta de salida del CSV de alarmas",
+          "log_csv": "Ruta de salida del CSV de registro",
+          "retention_days": "Retención (días, 0 = conservar para siempre)",
+          "max_rows": "Máximo de filas por archivo (0 = sin límite)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "La ruta del YAML de Console es obligatoria",
+      "yaml_not_found": "No se encontró el archivo YAML de Console en la ruta indicada",
+      "path_required": "La ruta es obligatoria",
+      "parent_not_writable": "El directorio principal no existe y no se pudo crear"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} punto(s) de configuración no válido(s)",
+      "description": "Algunos puntos de tu console.yaml se omitieron o están incompletos y no funcionarán como se espera:\n\n{problems}\n\nCorrígelos en console.yaml y luego recarga HASS Console (menú de la integración → Recargar, o el servicio hass_console.reload)."
+    }
+  }
+}

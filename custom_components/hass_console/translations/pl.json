@@ -1,0 +1,54 @@
+{
+  "title": "HASS Console",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Skonfiguruj HASS Console",
+        "description": "Wskaż HASS Console, gdzie znaleźć plik console.yaml i gdzie zapisywać pliki dziennika CSV. Plik console.yaml musi już istnieć — format opisano w pliku README. Pliki CSV zostaną utworzone automatycznie przy pierwszym uruchomieniu.",
+        "data": {
+          "console_yaml": "Ścieżka do pliku Console YAML",
+          "alarm_csv": "Ścieżka wyjściowa CSV alarmów",
+          "log_csv": "Ścieżka wyjściowa CSV dziennika",
+          "retention_days": "Przechowywanie (dni, 0 = przechowuj bez ograniczeń)",
+          "max_rows": "Maksymalna liczba wierszy na plik (0 = bez limitu)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Ścieżka do pliku Console YAML jest wymagana",
+      "yaml_not_found": "Nie znaleziono pliku Console YAML we wskazanej ścieżce",
+      "path_required": "Ścieżka jest wymagana",
+      "parent_not_writable": "Katalog nadrzędny nie istnieje i nie można go utworzyć"
+    },
+    "abort": {
+      "single_instance_allowed": "HASS Console jest już skonfigurowana. Obsługiwana jest tylko jedna instancja."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ustawienia HASS Console",
+        "description": "Zmień ścieżki plików i przechowywanie. Zmiany są stosowane natychmiast — ponowne uruchomienie nie jest wymagane.",
+        "data": {
+          "console_yaml": "Ścieżka do pliku Console YAML",
+          "alarm_csv": "Ścieżka wyjściowa CSV alarmów",
+          "log_csv": "Ścieżka wyjściowa CSV dziennika",
+          "retention_days": "Przechowywanie (dni, 0 = przechowuj bez ograniczeń)",
+          "max_rows": "Maksymalna liczba wierszy na plik (0 = bez limitu)"
+        }
+      }
+    },
+    "error": {
+      "yaml_required": "Ścieżka do pliku Console YAML jest wymagana",
+      "yaml_not_found": "Nie znaleziono pliku Console YAML we wskazanej ścieżce",
+      "path_required": "Ścieżka jest wymagana",
+      "parent_not_writable": "Katalog nadrzędny nie istnieje i nie można go utworzyć"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} nieprawidłowych punktów konfiguracji",
+      "description": "Niektóre punkty w pliku console.yaml zostały pominięte lub są niekompletne i nie będą działać zgodnie z oczekiwaniami:\n\n{problems}\n\nPopraw je w pliku console.yaml, a następnie przeładuj HASS Console (menu integracji → Przeładuj lub usługa hass_console.reload)."
+    }
+  }
+}
