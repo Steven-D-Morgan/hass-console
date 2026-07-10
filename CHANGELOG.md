@@ -4,6 +4,52 @@ All notable changes to this project are documented here, newest first. Versions 
 
 ---
 
+## v2.6.0 — 2026-07-10
+
+### 🐛 Fixed: Cron evaluated in local time
+
+LOG cron schedules and log-row timestamps were being evaluated against **UTC**, while
+alarms used local time — so `"0 0 * * *"` fired at UTC midnight, not your local midnight.
+The cron scanner now converts to the configured local timezone before matching and
+timestamping, so LOG and ALARM timestamps are consistent.
+
+### Changed
+
+- **Standard cron day semantics.** When **both** day-of-month and day-of-week are restricted,
+  a match on **either** now fires (standard Vixie-cron behaviour), instead of requiring both.
+- **Cron name aliases.** Month (`jan`–`dec`) and weekday (`sun`–`sat`) names are accepted, and
+  `7` is treated as Sunday — e.g. `"0 9 * * mon-fri"`, `"0 0 1 jan *"`.
+- **Real entities with restore.** `hass_console.log_*` / `alarm_*` are now proper Home Assistant
+  entities (unique IDs, registry entries, UI-manageable) that are created at startup and
+  **restore their last value across restarts**. Entity IDs are unchanged.
+- **Acknowledge notes persist.** The `note` passed to `acknowledge_alarm` / `acknowledge_all`
+  is now saved to a new `ack_note` column and shown on hover over the ✓ in the card. Existing
+  CSVs auto-migrate to add the column (no data loss).
+
+### Added
+
+- **Retention & rotation** (opt-in, off by default). New `retention_days` and `max_rows`
+  options (config flow / options flow) trim old rows on a daily schedule. **Unacknowledged
+  alarms are never pruned**, regardless of age. Keeping files bounded also keeps acknowledgment
+  fast. A future SQLite backend is noted as the next step for very large datasets.
+- **Config Repairs issue.** Invalid or incomplete `console.yaml` points (bad type, missing
+  `cron`/`entity`/`trigger`, unsupported platform, numeric trigger without `above`/`below`) now
+  raise a Home Assistant Repairs issue listing each problem, and clear automatically once fixed
+  and reloaded.
+
+### Changed files
+
+- `custom_components/hass_console/__init__.py` — local-time cron, cron OR-rule + name aliases,
+  entity wiring, `ack_note`, retention prune, config Repairs
+- `custom_components/hass_console/entity.py` — **new** `HassConsolePointEntity` (RestoreEntity)
+- `custom_components/hass_console/const.py` — `ack_note` column, retention constants, issue ID
+- `custom_components/hass_console/config_flow.py` — `retention_days` / `max_rows` fields
+- `custom_components/hass_console/strings.json`, `translations/en.json` — new labels + issue text
+- `www/hass-console-card.js` — ack-note hover
+- `manifest.json` — version 2.6.0
+
+---
+
 ## v2.5.2 — 2026-06-05
 
 ### 🐛 Bugfix: State Trigger Duration

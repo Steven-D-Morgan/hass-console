@@ -15,9 +15,13 @@ from .const import (
     CONF_CONSOLE_YAML,
     CONF_ALARM_CSV,
     CONF_LOG_CSV,
+    CONF_RETENTION_DAYS,
+    CONF_MAX_ROWS,
     DEFAULT_CONSOLE_YAML,
     DEFAULT_ALARM_CSV,
     DEFAULT_LOG_CSV,
+    DEFAULT_RETENTION_DAYS,
+    DEFAULT_MAX_ROWS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,6 +94,14 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_LOG_CSV,
                 default=defaults.get(CONF_LOG_CSV, DEFAULT_LOG_CSV),
             ): str,
+            vol.Optional(
+                CONF_RETENTION_DAYS,
+                default=defaults.get(CONF_RETENTION_DAYS, DEFAULT_RETENTION_DAYS),
+            ): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Optional(
+                CONF_MAX_ROWS,
+                default=defaults.get(CONF_MAX_ROWS, DEFAULT_MAX_ROWS),
+            ): vol.All(vol.Coerce(int), vol.Range(min=0)),
         })
 
         return self.async_show_form(
@@ -139,6 +151,14 @@ class HassConsoleOptionsFlow(config_entries.OptionsFlow):
                 CONF_LOG_CSV,
                 default=current.get(CONF_LOG_CSV, DEFAULT_LOG_CSV),
             ): str,
+            vol.Optional(
+                CONF_RETENTION_DAYS,
+                default=current.get(CONF_RETENTION_DAYS, DEFAULT_RETENTION_DAYS),
+            ): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Optional(
+                CONF_MAX_ROWS,
+                default=current.get(CONF_MAX_ROWS, DEFAULT_MAX_ROWS),
+            ): vol.All(vol.Coerce(int), vol.Range(min=0)),
         })
 
         return self.async_show_form(

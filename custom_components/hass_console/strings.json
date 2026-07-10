@@ -8,7 +8,9 @@
         "data": {
           "console_yaml": "Console YAML path",
           "alarm_csv": "Alarm CSV output path",
-          "log_csv": "Log CSV output path"
+          "log_csv": "Log CSV output path",
+          "retention_days": "Retention (days, 0 = keep forever)",
+          "max_rows": "Max rows per file (0 = unlimited)"
         }
       }
     },
@@ -26,11 +28,13 @@
     "step": {
       "init": {
         "title": "HASS Console settings",
-        "description": "Change file paths. Changes apply immediately — no restart needed.",
+        "description": "Change file paths and retention. Changes apply immediately — no restart needed.",
         "data": {
           "console_yaml": "Console YAML path",
           "alarm_csv": "Alarm CSV output path",
-          "log_csv": "Log CSV output path"
+          "log_csv": "Log CSV output path",
+          "retention_days": "Retention (days, 0 = keep forever)",
+          "max_rows": "Max rows per file (0 = unlimited)"
         }
       }
     },
@@ -39,6 +43,12 @@
       "yaml_not_found": "Console YAML file not found at the given path",
       "path_required": "Path is required",
       "parent_not_writable": "Parent directory does not exist and could not be created"
+    }
+  },
+  "issues": {
+    "invalid_config": {
+      "title": "HASS Console: {count} invalid config point(s)",
+      "description": "Some points in your console.yaml were skipped or incomplete and won't work as expected:\n\n{problems}\n\nFix them in console.yaml, then reload HASS Console (integration menu → Reload, or the hass_console.reload service)."
     }
   }
 }

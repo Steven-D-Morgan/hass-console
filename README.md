@@ -593,13 +593,13 @@ Two separate CSV files in `/config/www/`, accessible at `/local/` URLs:
 ### alarms.csv
 
 ```
-id, timestamp, category, entity, class, value, duration, note, trigger, ack
+id, timestamp, category, entity, class, value, duration, note, trigger, ack, ack_note
 ```
 
 | Column | Description |
 |--------|-------------|
 | id | Unique 8-char hex ID for this alarm |
-| timestamp | `YYYY-MM-DD HH:MM:SS` when the alarm fired |
+| timestamp | `YYYY-MM-DD HH:MM:SS` when the alarm fired (local time) |
 | category | System type (HVAC, E-METER, etc.) |
 | entity | HASS Console entity ID |
 | class | Severity class (01, 02, 03, etc.) |
@@ -608,6 +608,7 @@ id, timestamp, category, entity, class, value, duration, note, trigger, ack
 | note | Static note from config |
 | trigger | Alias of the trigger that fired |
 | ack | Empty = unacknowledged, timestamp = when acknowledged |
+| ack_note | Optional note supplied when acknowledging (shown on hover over the ✓ in the card) |
 
 ### logs.csv
 
@@ -626,6 +627,26 @@ timestamp, category, entity, value, note
 ### Automatic migration
 
 On every startup, the engine checks existing CSV headers against the current schema. If columns are missing (e.g., upgrading from an older version), it rewrites the file with the new columns, filling existing rows with empty values and generating IDs where needed. No data loss.
+
+### Retention & rotation
+
+By default HASS Console keeps everything forever. Two optional settings (Settings → Devices &
+Services → HASS Console → **Configure**) bound file growth so acknowledgment and the card stay
+fast on long-running installs:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `retention_days` | `0` (keep forever) | Rows older than this many days are pruned by a daily task. |
+| `max_rows` | `0` (unlimited) | Each file is trimmed to its newest N rows. |
+
+**Unacknowledged alarms are never pruned**, regardless of age or the row cap — only acknowledged
+alarms and log rows age out. Both settings apply to every CSV in use, including custom
+`target_csv` files. Retention is opt-in: with both at `0`, nothing is ever deleted.
+
+> **Future: SQLite backend.** For very large datasets (years of high-frequency logs), a SQLite
+> store is the planned next step — acknowledgment becomes a single indexed `UPDATE` and filtering
+> is done in the database rather than by rewriting a file. Retention/rotation covers the CSV case
+> until then.
 
 ---
 
@@ -941,7 +962,10 @@ hass_console.<type>_<point_name_in_lowercase>
 | `WEEKLY_WATER` | LOG | `hass_console.log_weekly_water` |
 | `UPS_LOW` | ALARM | `hass_console.alarm_ups_low` |
 
-These are real HA entities — usable in automations, Lovelace cards, history graphs, etc.
+These are real HA entities — usable in automations, Lovelace cards, history graphs, etc. They
+are created at startup (so they exist before the first log/alarm fires), carry unique IDs and
+registry entries (renameable/manageable in the UI), and **restore their last value across
+Home Assistant restarts**.
 
 ---
 
@@ -978,6 +1002,16 @@ These are real HA entities — usable in automations, Lovelace cards, history gr
 | `"0 */4 * * *"` | Every 4 hours |
 
 Always wrap cron expressions in quotes in YAML.
+
+**Timezone.** Cron expressions are evaluated in Home Assistant's configured local timezone —
+`"0 0 * * *"` fires at your local midnight.
+
+**Name aliases.** Months (`jan`–`dec`) and weekdays (`sun`–`sat`) may be used in place of
+numbers, and `7` is accepted as Sunday. Examples: `"0 9 * * mon-fri"`, `"0 0 1 jan,jul *"`.
+
+**Day-of-month vs day-of-week.** Following standard (Vixie) cron: when **both** the
+day-of-month and day-of-week fields are restricted (neither is `*`), the schedule fires when
+**either** matches. If only one is restricted, only that field must match.
 
 ---
 
