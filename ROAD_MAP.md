@@ -12,7 +12,8 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## ✅ Recently Shipped (for context)
 
-- **v2.6.1** — cards auto-register from the integration (served + auto-loaded, versioned cache-bust); no more manual Dashboards → Resources. Minimum HA bumped to 2024.7.
+- **v2.6.2** — fix card auto-registration: register the cards as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see).
+- **v2.6.1** — bundle the cards inside the integration and serve them; minimum HA bumped to 2024.7. (Auto-registration didn't work reliably until 2.6.2.)
 - **v2.6.0** — local-time cron + OR day-rule + name aliases, real restorable `hass_console.*` entities, opt-in retention/rotation (unacknowledged alarms never pruned), acknowledge notes, Config Repairs for invalid `console.yaml`.
 - **v2.5.2** — state-trigger duration fix for entities already in the alarm state; `show_alarm`/`show_log` card tabs.
 - **v2.5.0** — state triggers, multi-condition AND, theme support, summary card, integration icon, HACS support files.
@@ -21,7 +22,7 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## 🎯 Next Up
 
-- [x] **Auto-register the Lovelace cards from the integration** `high · med` — today users must copy `hass-console-card.js` + `hass-console-summary-card.js` into `/config/www/` and add two Lovelace **Resources** by hand, then bump a cache-buster on every update. Bundle the cards inside `custom_components/hass_console/` (so HACS ships them), serve them with `async_register_static_paths`, and auto-load them via `frontend.add_extra_js_url` with a `?v={manifest_version}` query — no manual Resources entry, cache busts itself on every release. _The #1 friction for new users._ **✅ Shipped in 2.6.1.**
+- [x] **Auto-register the Lovelace cards from the integration** `high · med` — today users must copy `hass-console-card.js` + `hass-console-summary-card.js` into `/config/www/` and add two Lovelace **Resources** by hand, then bump a cache-buster on every update. Bundle the cards inside `custom_components/hass_console/` (so HACS ships them), serve them with `async_register_static_paths`, and auto-load them via `frontend.add_extra_js_url` with a `?v={manifest_version}` query — no manual Resources entry. _The #1 friction for new users._ **✅ Shipped in 2.6.1, fixed in 2.6.2** — the cards are registered as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see the element).
 - [x] **Single-source the version + cut a clean stable 2.6.0** `high · small` — **✅ Shipped.** manifest/card/CHANGELOG reconciled to one version and a clean stable `2.6.0` tag published, so default HACS users (beta toggle off) now receive the 2.6.0 feature set instead of being stuck on 2.5.2.
 - [x] **Release-time version guard** `med · small` — a job that fails if `manifest.json` version ≠ tag ≠ CHANGELOG heading ≠ card `VER`/summary `SVER`, so they can never drift again. **✅ Shipped** as `.github/workflows/version-guard.yaml` (runs on `release: published`, PRs to main, and manual dispatch).
 - [ ] **`.gitignore` + drop committed bytecode** `med · small` — `custom_components/hass_console/__pycache__/*.pyc` (py3.14) is tracked and would otherwise ship to every user. Add a `.gitignore` and `git rm` the tracked `.pyc`.

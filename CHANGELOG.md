@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v2.6.2](#v262--2026-08-11) | 2026-08-11 | Fix card auto-registration (register as a Lovelace resource) |
 | [v2.6.1](#v261--2026-08-11) | 2026-08-11 | Cards auto-register — no more manual Dashboards → Resources |
 | [v2.6.0](#v260--2026-07-10) | 2026-07-10 | Local-time cron, real restorable entities, retention/rotation, acknowledge notes, Config Repairs |
 | [v2.5.2](#v252--2026-06-05) | 2026-06-05 | State-trigger duration fix; show/hide card tabs |
@@ -20,6 +21,36 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v2.6.2 — 2026-08-11
+
+### 🐛 Fixed: cards now actually auto-register
+
+2.6.1 tried to auto-load the cards via the frontend `extra_module_url`, but that defines
+the card too early — before Home Assistant's scoped element registry is in place — so the
+dashboard couldn't find the element ("Custom element not found") and the cards wouldn't
+render or appear selectable in the picker. 2.6.2 registers the cards as **Lovelace
+resources** instead, which is the mechanism the dashboard actually waits for, so they load
+reliably.
+
+### Changed
+
+- The integration now registers `/hass_console_frontend/…` as Lovelace resources
+  (type: module), **idempotently** and only on **storage-mode** dashboards. Existing
+  resources are loaded first, so nothing else in your Resources list is touched
+  ([core#165767](https://github.com/home-assistant/core/issues/165767)).
+- If you added the resources by hand as a 2.6.1 workaround, they're detected and **not
+  duplicated**.
+- **YAML-mode Lovelace:** an integration can't add resources there, so a log message lists
+  the two URLs to add manually.
+- Removed the `add_extra_js_url` auto-load that didn't work.
+
+### Changed files
+
+- `custom_components/hass_console/__init__.py` — register cards as Lovelace resources
+  (load-before-write to avoid wiping resources, idempotent, storage-mode only)
 
 ---
 

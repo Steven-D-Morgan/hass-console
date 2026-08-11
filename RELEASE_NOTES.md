@@ -4,6 +4,20 @@ User-facing notes for each release, newest first. For the full change-by-change 
 
 ---
 
+## 2.6.2 — Fix: cards now actually auto-register
+
+2.6.1's auto-load didn't work — the cards showed a "Custom element not found" error and wouldn't render, because the loading mechanism defined them too early for the dashboard to see. 2.6.2 registers the cards as **Lovelace resources** (the mechanism the dashboard waits for), so they load reliably with no manual setup.
+
+### 🐛 Fixed
+- Cards now auto-register and render (previously failed with "Custom element not found").
+
+### 📝 Notes
+- Auto-registration works on standard **storage-mode** dashboards. In YAML-mode Lovelace, add the two resources manually (`/hass_console_frontend/hass-console-card.js` and `…summary-card.js`, type: JavaScript Module) — the HA log lists them.
+- **If you added those resources by hand on 2.6.1**, 2.6.2 detects them and won't create duplicates.
+- Requires Home Assistant 2024.7+.
+
+---
+
 ## 2.6.1 — Cards install themselves (no more Dashboards → Resources)
 
 The integration now ships the Lovelace cards inside itself and loads them for you. Fresh installs *and* updates no longer need the "copy the card to `/config/www/` and add it under Settings → Dashboards → Resources" steps — the cards just appear, and they cache-bust automatically on every update.

@@ -12,7 +12,6 @@ from typing import Any
 import voluptuous as vol
 import yaml
 
-from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.loader import async_get_integration
@@ -889,26 +888,82 @@ def _get_component(hass) -> EntityComponent:
 
 
 async def _async_register_frontend(hass) -> None:
-    """Serve the bundled Lovelace cards and auto-load them (once per hass)."""
+    """Serve the bundled cards and register them as Lovelace resources (once per hass)."""
     data = hass.data.setdefault(DOMAIN, {})
     if data.get("_frontend_registered"):
         return
     data["_frontend_registered"] = True
 
     root = Path(__file__).parent / "frontend"
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(f"{FRONTEND_URL_BASE}/{name}", str(root / name), True)
-            for name in FRONTEND_CARDS
-        ]
-    )
     try:
-        integration = await async_get_integration(hass, DOMAIN)
-        version = str(integration.version)
-    except Exception:  # best-effort cache-buster only
-        version = "0"
-    for name in FRONTEND_CARDS:
-        add_extra_js_url(hass, f"{FRONTEND_URL_BASE}/{name}?v={version}")
+        await hass.http.async_register_static_paths(
+            [
+                StaticPathConfig(f"{FRONTEND_URL_BASE}/{name}", str(root / name), False)
+                for name in FRONTEND_CARDS
+            ]
+        )
+    except RuntimeError:
+        pass  # already registered (e.g. on reload)
+
+    # Register the cards as Lovelace resources — the mechanism the dashboard actually
+    # waits for. (add_extra_js_url loads too early / into the wrong registry, so the
+    # dashboard can't find the element: "Custom element not found".) Run in a background
+    # task so a slow resource store can't hold up setup.
+    hass.async_create_task(_async_register_card_resources(hass))
+
+
+async def _async_register_card_resources(hass) -> None:
+    """Add the bundled cards to Lovelace resources, idempotently (storage mode only)."""
+    lovelace = hass.data.get("lovelace")
+    if lovelace is None:
+        return
+    mode = getattr(lovelace, "mode", getattr(lovelace, "resource_mode", "yaml"))
+    resources = getattr(lovelace, "resources", None)
+    manual_hint = ", ".join(f"{FRONTEND_URL_BASE}/{n}" for n in FRONTEND_CARDS)
+    if mode != "storage" or resources is None:
+        _LOGGER.info(
+            "Lovelace is not in storage mode; add the HASS Console cards as resources "
+            "(type: JavaScript Module) manually if needed: %s",
+            manual_hint,
+        )
+        return
+
+    try:
+        # Load existing resources BEFORE creating anything: calling async_create_item()
+        # on an unloaded collection wipes all existing resources (home-assistant/core#165767).
+        if not getattr(resources, "loaded", False):
+            await resources.async_load()
+            resources.loaded = True
+
+        try:
+            version = str((await async_get_integration(hass, DOMAIN)).version)
+        except Exception:  # pragma: no cover - best-effort cache-buster
+            version = "0"
+
+        items = resources.async_items()
+        for name in FRONTEND_CARDS:
+            base = f"{FRONTEND_URL_BASE}/{name}"
+            desired = f"{base}?v={version}"
+            existing = next(
+                (r for r in items if str(r.get("url", "")).split("?", 1)[0] == base),
+                None,
+            )
+            if existing is None:
+                await resources.async_create_item(
+                    {"res_type": "module", "url": desired}
+                )
+                _LOGGER.info("Registered HASS Console card resource: %s", base)
+            elif existing.get("url") != desired and existing.get("id"):
+                await resources.async_update_item(
+                    existing["id"], {"res_type": "module", "url": desired}
+                )
+    except Exception as err:  # never crash setup, never risk the resource store
+        _LOGGER.warning(
+            "Could not auto-register HASS Console card resources (%s); add them "
+            "manually if the cards don't appear: %s",
+            err,
+            manual_hint,
+        )
 
 
 # ──────────────────────────────────────────────────────────────────

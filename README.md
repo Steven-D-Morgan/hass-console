@@ -88,7 +88,7 @@ Requires Home Assistant **2024.7 or newer**. See [simple-setup.md](simple-setup.
 4. **Settings → Devices & Services → + Add Integration → HASS Console**
 5. Add the **HASS Console Card** (and optional **Summary Card**) to a dashboard
 
-The Lovelace cards are bundled with the integration and **load automatically** — you no longer copy card files to `/config/www/` or register anything under **Settings → Dashboards → Resources**. Both cards appear in the dashboard card picker after a refresh.
+The Lovelace cards are bundled with the integration and **register themselves** — on a standard (storage-mode) dashboard the integration adds them to **Settings → Dashboards → Resources** for you, so you don't copy anything to `/config/www/` or add resources by hand. If your Lovelace is in **YAML mode**, Home Assistant won't let an integration add resources — add the two `/hass_console_frontend/…` URLs (listed in the HA log) as `JavaScript Module` resources yourself. Both cards then appear in the card picker after a refresh.
 
 ### Updating
 
@@ -1138,7 +1138,7 @@ logger:
 
 **Card shows "No entries yet"** — Click ↻ Refresh. Verify the CSV URLs in the card config. Open the URL directly in a browser to check the file.
 
-**Card not loading** — Since 2.6.1 the cards load automatically with the integration; confirm the integration is installed and HA has been restarted, then hard-refresh (Ctrl+Shift+R). If you upgraded from 2.6.0 or earlier, remove any old HASS Console entries under Settings → Dashboards → Resources so a stale cached copy isn't loaded instead.
+**Card not loading** — The integration registers the cards as Lovelace resources automatically on storage-mode dashboards. If they don't appear: confirm the integration is installed and HA was restarted, then hard-refresh (Ctrl+Shift+R). If your dashboards use **YAML mode**, add the two `/hass_console_frontend/…` URLs (from the HA log) as `JavaScript Module` resources. If you upgraded from an earlier version, also remove any old `/local/hass-console-*.js` resource entries so a stale cached copy isn't loaded instead.
 
 **Config flow 500 error** — Restart HA after copying the integration files. The config flow requires a full restart to register.
 

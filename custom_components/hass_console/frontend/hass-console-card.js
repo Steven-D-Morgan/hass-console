@@ -1,5 +1,5 @@
 /**
- * HASS Console Card v2.6.1
+ * HASS Console Card v2.6.2
  *
  * CONFIG:
  *   type: custom:hass-console-card
@@ -12,7 +12,7 @@
  *   show_alarm: true     # show the Alarm tab (default true)
  *   show_log: true       # show the Log tab (default true)
  */
-const VER="2.6.1";
+const VER="2.6.2";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
