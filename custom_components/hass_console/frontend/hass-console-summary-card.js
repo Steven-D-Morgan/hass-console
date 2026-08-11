@@ -1,5 +1,5 @@
 /**
- * HASS Console Summary Card v2.6.0
+ * HASS Console Summary Card v2.6.1
  *
  * Minimalist alarm severity gauges. Three numbers. That's it.
  *
@@ -9,7 +9,7 @@
  *   theme: auto
  *   refresh_interval: 30
  */
-const SVER = "2.6.0";
+const SVER = "2.6.1";
 
 class HassConsoleSummaryCard extends HTMLElement {
   constructor() {
@@ -145,10 +145,12 @@ class HassConsoleSummaryCard extends HTMLElement {
   }
 }
 
-customElements.define("hass-console-summary-card", HassConsoleSummaryCard);
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "hass-console-summary-card",
-  name: "HASS Console Summary Card",
-  description: "Minimalist alarm severity gauges",
-});
+if (!customElements.get("hass-console-summary-card")) {
+  customElements.define("hass-console-summary-card", HassConsoleSummaryCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: "hass-console-summary-card",
+    name: "HASS Console Summary Card",
+    description: "Minimalist alarm severity gauges",
+  });
+}

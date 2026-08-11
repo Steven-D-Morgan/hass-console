@@ -3,11 +3,11 @@
   "name": "HASS Console - Alarm & Log Engine",
   "codeowners": ["@Steven-D-Morgan"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["frontend"],
   "documentation": "https://github.com/Steven-D-Morgan/hass-console",
   "integration_type": "service",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Steven-D-Morgan/hass-console/issues",
   "requirements": [],
-  "version": "2.6.0"
+  "version": "2.6.1"
 }

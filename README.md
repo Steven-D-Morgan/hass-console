@@ -68,7 +68,7 @@ HASS Console is a custom integration (domain: `hass_console`) with three parts:
                │
                ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  HASS Console Card  (www/hass-console-card.js)               │
+│  HASS Console Card  (frontend/hass-console-card.js)          │
 │                                                              │
 │  Fetches both CSVs → tabbed view with filters                │
 │  Acknowledge alarms → calls HA service → updates CSV         │
@@ -80,15 +80,21 @@ HASS Console is a custom integration (domain: `hass_console`) with three parts:
 
 ## Installation
 
-See [simple-setup.md](simple-setup.md) for the 5-minute walkthrough. The short version:
+Requires Home Assistant **2024.7 or newer**. See [simple-setup.md](simple-setup.md) for the 5-minute walkthrough. The short version:
 
-1. Copy `custom_components/hass_console/` → `/config/custom_components/hass_console/`
-2. Copy `www/hass-console-card.js` → `/config/www/hass-console-card.js`
-3. Create `/config/console.yaml` with your alarm and log points
-4. Restart Home Assistant
-5. **Settings → Devices & Services → + Add Integration → HASS Console**
-6. Register the card resource → `/local/hass-console-card.js` (JavaScript Module)
-7. Add the card to a dashboard
+1. Copy `custom_components/hass_console/` → `/config/custom_components/hass_console/` (or install via HACS as a custom repository)
+2. Create `/config/console.yaml` with your alarm and log points
+3. Restart Home Assistant
+4. **Settings → Devices & Services → + Add Integration → HASS Console**
+5. Add the **HASS Console Card** (and optional **Summary Card**) to a dashboard
+
+The Lovelace cards are bundled with the integration and **load automatically** — you no longer copy card files to `/config/www/` or register anything under **Settings → Dashboards → Resources**. Both cards appear in the dashboard card picker after a refresh.
+
+### Updating
+
+Re-copy `custom_components/hass_console/` over the old folder (or update through HACS), then restart Home Assistant. The cards update themselves — their auto-loaded URL is versioned, so it cache-busts on every release with no manual re-copy or hard-refresh.
+
+**Upgrading from 2.6.0 or earlier:** remove the two HASS Console entries from **Settings → Dashboards → Resources** — the integration now loads the cards for you. If you leave them, the old (pre-2.6.1) card file is unguarded, so it can log an "already defined" error in the browser console and may keep serving a stale cached copy; your dashboard keeps working either way. You can also delete the old `/config/www/hass-console-card.js` and `hass-console-summary-card.js` files.
 
 Existing users with `hass_console: !include console.yaml` in `configuration.yaml` can continue using YAML setup — both modes are supported.
 
@@ -746,12 +752,7 @@ A compact at-a-glance widget for overview dashboards. Shows alarm counts by seve
 
 ### Setup
 
-Register as a second resource: **Settings → Dashboards → Resources → Add Resource**
-
-| Field | Value |
-|-------|-------|
-| URL   | `/local/hass-console-summary-card.js` |
-| Type  | JavaScript Module |
+The summary card is bundled with the integration and loads automatically — no resource registration needed. Add it to a dashboard as `custom:hass-console-summary-card` (it also appears in the card picker as **HASS Console Summary Card**).
 
 ### Configuration
 
@@ -1137,7 +1138,7 @@ logger:
 
 **Card shows "No entries yet"** — Click ↻ Refresh. Verify the CSV URLs in the card config. Open the URL directly in a browser to check the file.
 
-**Card not loading** — Verify the resource is registered (Settings → Dashboards → Resources) with type "JavaScript Module". Hard refresh (Ctrl+Shift+R).
+**Card not loading** — Since 2.6.1 the cards load automatically with the integration; confirm the integration is installed and HA has been restarted, then hard-refresh (Ctrl+Shift+R). If you upgraded from 2.6.0 or earlier, remove any old HASS Console entries under Settings → Dashboards → Resources so a stale cached copy isn't loaded instead.
 
 **Config flow 500 error** — Restart HA after copying the integration files. The config flow requires a full restart to register.
 

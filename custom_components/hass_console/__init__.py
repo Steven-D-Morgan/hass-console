@@ -12,7 +12,10 @@ from typing import Any
 import voluptuous as vol
 import yaml
 
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.loader import async_get_integration
 from homeassistant.const import (
     CONF_ALIAS, CONF_ENTITY_ID, CONF_PLATFORM,
     CONF_ABOVE, CONF_BELOW, CONF_FOR,
@@ -47,6 +50,9 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORM_NUMERIC = "numeric_state"
 PLATFORM_STATE = "state"
 SUPPORTED_PLATFORMS = {PLATFORM_NUMERIC, PLATFORM_STATE}
+
+FRONTEND_URL_BASE = "/hass_console_frontend"
+FRONTEND_CARDS = ("hass-console-card.js", "hass-console-summary-card.js")
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -882,12 +888,36 @@ def _get_component(hass) -> EntityComponent:
     return component
 
 
+async def _async_register_frontend(hass) -> None:
+    """Serve the bundled Lovelace cards and auto-load them (once per hass)."""
+    data = hass.data.setdefault(DOMAIN, {})
+    if data.get("_frontend_registered"):
+        return
+    data["_frontend_registered"] = True
+
+    root = Path(__file__).parent / "frontend"
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(f"{FRONTEND_URL_BASE}/{name}", str(root / name), True)
+            for name in FRONTEND_CARDS
+        ]
+    )
+    try:
+        integration = await async_get_integration(hass, DOMAIN)
+        version = str(integration.version)
+    except Exception:  # best-effort cache-buster only
+        version = "0"
+    for name in FRONTEND_CARDS:
+        add_extra_js_url(hass, f"{FRONTEND_URL_BASE}/{name}?v={version}")
+
+
 # ──────────────────────────────────────────────────────────────────
 # Setup — YAML mode (legacy)
 # ──────────────────────────────────────────────────────────────────
 
 async def async_setup(hass, config):
     _register_services(hass)
+    await _async_register_frontend(hass)
     if DOMAIN not in config:
         return True
     component = _get_component(hass)

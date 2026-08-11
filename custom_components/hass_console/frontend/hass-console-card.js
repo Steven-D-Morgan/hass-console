@@ -1,5 +1,5 @@
 /**
- * HASS Console Card v2.6.0
+ * HASS Console Card v2.6.1
  *
  * CONFIG:
  *   type: custom:hass-console-card
@@ -12,7 +12,7 @@
  *   show_alarm: true     # show the Alarm tab (default true)
  *   show_log: true       # show the Log tab (default true)
  */
-const VER="2.6.0";
+const VER="2.6.1";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
@@ -270,6 +270,8 @@ disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
 static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30}}
 }
 
+if(!customElements.get("hass-console-card")){
 customElements.define("hass-console-card",HassConsoleCard);
 window.customCards=window.customCards||[];
 window.customCards.push({type:"hass-console-card",name:"HASS Console Card",description:"Niagara-style Alarm & Log console for Home Assistant"});
+}

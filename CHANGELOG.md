@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v2.6.1](#v261--2026-08-11) | 2026-08-11 | Cards auto-register — no more manual Dashboards → Resources |
 | [v2.6.0](#v260--2026-07-10) | 2026-07-10 | Local-time cron, real restorable entities, retention/rotation, acknowledge notes, Config Repairs |
 | [v2.5.2](#v252--2026-06-05) | 2026-06-05 | State-trigger duration fix; show/hide card tabs |
 | [v2.5.1](#v251--2026-06-05) | 2026-06-05 | HACS/Hassfest validation fixes |
@@ -19,6 +20,43 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v2.6.1 — 2026-08-11
+
+### ✨ Cards auto-register — no more Dashboards → Resources
+
+The integration now serves and auto-loads both Lovelace cards itself. You no longer
+copy card files to `/config/www/` or register resources by hand — install or update the
+integration and the cards appear. The auto-loaded URL is versioned, so it cache-busts
+automatically on update (no more hard-refresh).
+
+### Changed
+
+- **Cards moved into the integration** at `custom_components/hass_console/frontend/`,
+  served at `/hass_console_frontend/…` and auto-loaded via the frontend `extra_module_url`
+  list (`async_register_static_paths` + `add_extra_js_url`).
+- **Minimum Home Assistant is now 2024.7** — required for `async_register_static_paths`
+  (the old `register_static_path` was removed in HA 2025.7).
+- Card custom-element registration is now **guarded** (`customElements.get(...)` check) so the
+  bundled card won't redefine an element that's already registered (and updates from 2.6.1 on are
+  double-load safe).
+
+### Upgrade note
+
+If you previously added the HASS Console cards under **Settings → Dashboards → Resources**,
+remove those two entries after updating — the integration loads the cards automatically now.
+If you leave them, the old (pre-2.6.1) card file is unguarded, so it can log an "already defined"
+error in the browser console and may keep serving a stale cached copy — your dashboard keeps
+working either way.
+
+### Changed files
+
+- `custom_components/hass_console/__init__.py` — serve + auto-load cards on setup
+- `custom_components/hass_console/frontend/` — **new** home for both cards (moved from `www/`)
+- `custom_components/hass_console/manifest.json` — `frontend` dependency, version 2.6.1
+- `hacs.json` — minimum Home Assistant 2024.7.0
 
 ---
 

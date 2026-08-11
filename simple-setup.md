@@ -12,7 +12,7 @@ Both modes are supported and use the same `console.yaml` for defining alarm and 
 
 ## What You Need
 
-- Home Assistant (2024.1 or newer)
+- Home Assistant (2024.7 or newer)
 - Access to your HA config directory (File Editor add-on, SSH, Samba, etc.)
 
 ---
@@ -27,16 +27,15 @@ git clone https://github.com/Steven-D-Morgan/hass-console.git
 
 ---
 
-## Step 2 — Copy Two Folders
+## Step 2 — Copy the Integration Folder
 
-Copy these into your Home Assistant config directory:
+Copy this into your Home Assistant config directory:
 
 | From | To |
 |------|----|
 | `custom_components/hass_console/` | `/config/custom_components/hass_console/` |
-| `www/hass-console-card.js` | `/config/www/hass-console-card.js` |
 
-If `custom_components/` or `www/` don't exist yet, create them.
+If `custom_components/` doesn't exist yet, create it. The Lovelace cards ship **inside** this folder and load automatically — there's nothing to copy into `/config/www/` and no resource to register.
 
 ---
 
@@ -105,17 +104,7 @@ Restart HA again.
 
 ---
 
-## Step 6 — Register the Lovelace Card
-
-1. **Settings → Dashboards → ⋮ (top right) → Resources**
-2. Click **Add Resource**
-3. URL: `/local/hass-console-card.js`
-4. Type: **JavaScript Module**
-5. Click **Create**
-
----
-
-## Step 7 — Add the Card to a Dashboard
+## Step 6 — Add the Card to a Dashboard
 
 1. Open any dashboard, click **Edit** (pencil icon) → **Add Card**
 2. Scroll down and choose **Manual**

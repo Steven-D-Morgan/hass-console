@@ -4,6 +4,22 @@ User-facing notes for each release, newest first. For the full change-by-change 
 
 ---
 
+## 2.6.1 — Cards install themselves (no more Dashboards → Resources)
+
+The integration now ships the Lovelace cards inside itself and loads them for you. Fresh installs *and* updates no longer need the "copy the card to `/config/www/` and add it under Settings → Dashboards → Resources" steps — the cards just appear, and they cache-bust automatically on every update.
+
+### ⚙️ Changed
+- Both cards moved into the integration and are served + auto-loaded by it.
+- **Minimum Home Assistant is now 2024.7.**
+
+### ⚠️ Upgrade note — remove old card resources
+If you added the HASS Console cards under **Settings → Dashboards → Resources** in a previous version, delete those two entries after updating. The integration loads the cards automatically now; a leftover resource pointing at the old (pre-2.6.1, unguarded) card can log an "already defined" error in the browser console and keep serving an older cached copy — the dashboard still works, but it's cleaner to remove it. You can also delete the old `/config/www/hass-console-card.js` and `hass-console-summary-card.js` files.
+
+### 📝 Notes
+No config or entity changes — existing dashboards keep working.
+
+---
+
 ## 2.6.0 — Local-time cron, real entities, retention & acknowledge notes
 
 A feature and correctness release. Existing `console.yaml` configs and CSV files keep working — CSVs auto-migrate on first start, so this is a drop-in upgrade.
