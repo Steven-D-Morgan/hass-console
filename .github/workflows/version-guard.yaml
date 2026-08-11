@@ -1,0 +1,47 @@
+name: Version Guard
+
+on:
+  release:
+    types: [published]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  version-guard:
+    name: Versions agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check manifest / card / summary / CHANGELOG / tag agree
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -uo pipefail
+
+          MANIFEST=$(python3 -c "import json;print(json.load(open('custom_components/hass_console/manifest.json'))['version'])")
+          CARD=$(sed -n 's/.*const VER="\([^"]*\)".*/\1/p' custom_components/hass_console/frontend/hass-console-card.js | head -1)
+          SUMMARY=$(sed -n 's/.*const SVER *= *"\([^"]*\)".*/\1/p' custom_components/hass_console/frontend/hass-console-summary-card.js | head -1)
+          CHANGELOG=$(grep -m1 -oE '^## v[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | sed 's/^## v//')
+
+          # Strip an optional leading "v" so v2.6.1 and 2.6.1 compare equal (HACS does the same).
+          norm() { printf '%s' "${1#v}"; }
+          M=$(norm "$MANIFEST"); C=$(norm "$CARD"); S=$(norm "$SUMMARY"); CL=$(norm "$CHANGELOG"); T=$(norm "${TAG_NAME:-}")
+
+          echo "manifest=$M  card=$C  summary=$S  changelog=$CL  tag=${T:-<none, not a release>}"
+
+          fail=0
+          [ -n "$M" ] || { echo "::error::could not read manifest.json version"; fail=1; }
+          [ "$C" = "$M" ]  || { echo "::error::card VER ($C) != manifest ($M)"; fail=1; }
+          [ "$S" = "$M" ]  || { echo "::error::summary SVER ($S) != manifest ($M)"; fail=1; }
+          [ "$CL" = "$M" ] || { echo "::error::CHANGELOG heading ($CL) != manifest ($M)"; fail=1; }
+          if [ -n "$T" ]; then
+            [ "$T" = "$M" ] || { echo "::error::release tag ($T) != manifest ($M)"; fail=1; }
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Version mismatch — reconcile manifest.json / card VER / summary SVER / CHANGELOG heading / release tag."
+            exit 1
+          fi
+          echo "✅ All versions agree: $M"
