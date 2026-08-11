@@ -3,7 +3,7 @@
 A living backlog for **HASS Console**. Items are tagged `impact · effort` (`high/med/low` · `small/med/large`) and grouped by priority. Checkboxes track status; move items to **Recently Shipped** as they land.
 
 Two constraints shape everything below:
-- **Directory-tree HACS install.** HACS installs the integration by copying the whole `custom_components/hass_console/` tree from the release tag — there is no single build artifact. The Lovelace cards in `www/` are **not** shipped by HACS today, so users hand-copy them and register two Lovelace resources by hand. Removing that manual step is the biggest open UX item (see *Next Up*).
+- **Directory-tree HACS install.** HACS installs the integration by copying the whole `custom_components/hass_console/` tree from the release tag — there is no single build artifact. As of 2.6.1 the Lovelace cards live inside that tree (`custom_components/hass_console/frontend/`) and are served + auto-loaded by the integration, so they ship and register themselves — no `www/` copy and no manual Resources entry.
 - **Backward compatibility / no data loss.** Existing `console.yaml` configs and CSV files must keep working; the engine already auto-migrates CSV schemas, and new behaviour should be opt-in with sensible defaults.
 
 This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite as the next storage step) and an Aug 2026 review; additional ideas are marked _(suggested)_.
@@ -22,7 +22,7 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 ## 🎯 Next Up
 
 - [x] **Auto-register the Lovelace cards from the integration** `high · med` — today users must copy `hass-console-card.js` + `hass-console-summary-card.js` into `/config/www/` and add two Lovelace **Resources** by hand, then bump a cache-buster on every update. Bundle the cards inside `custom_components/hass_console/` (so HACS ships them), serve them with `async_register_static_paths`, and auto-load them via `frontend.add_extra_js_url` with a `?v={manifest_version}` query — no manual Resources entry, cache busts itself on every release. _The #1 friction for new users._ **✅ Shipped in 2.6.1.**
-- [ ] **Single-source the version + cut a clean stable 2.6.0** `high · small` — `manifest.json` says `2.6.0b1` while the CHANGELOG and card `VER` say `2.6.0`, and the newest **stable** tag is `2.5.2`, so default HACS users (beta toggle off) never receive the 2.6.0 feature set. Reconcile manifest/tag/CHANGELOG/card to one value and publish a clean stable `2.6.0`.
+- [x] **Single-source the version + cut a clean stable 2.6.0** `high · small` — **✅ Shipped.** manifest/card/CHANGELOG reconciled to one version and a clean stable `2.6.0` tag published, so default HACS users (beta toggle off) now receive the 2.6.0 feature set instead of being stuck on 2.5.2.
 - [ ] **Release-time version guard** `med · small` — a job on `release: published` that fails if `manifest.json` version ≠ tag ≠ CHANGELOG heading ≠ card `VER`, so the four can never drift again.
 - [ ] **`.gitignore` + drop committed bytecode** `med · small` — `custom_components/hass_console/__pycache__/*.pyc` (py3.14) is tracked and would otherwise ship to every user. Add a `.gitignore` and `git rm` the tracked `.pyc`.
 - [ ] **Consistent tag scheme** `low · small` — tags mix unprefixed semver (`2.5.2`), non-semver (`2.6.0_BETA`), and PEP440 beta (`v2.6.0b1`). Standardize on one convention going forward.
@@ -56,7 +56,7 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## 📚 Docs
 
-- [ ] **Trim manual card-install steps once cards auto-register** `med · small` — once the integration serves the cards itself, remove the "copy to `www` + add Resource" steps from the README.
+- [x] **Trim manual card-install steps** `med · small` — **✅ Shipped in 2.6.1.** README + simple-setup.md no longer tell users to copy the card to `www` or add a Resource; they document the auto-load flow and the upgrade cleanup.
 - [ ] **Example `console.yaml` library** `low · small` _(suggested)_ — a few small, focused annotated configs (just LOG points, just ALARMs, custom target CSVs) alongside the full reference.
 
 ---
