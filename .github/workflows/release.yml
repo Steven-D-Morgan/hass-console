@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Attach integration zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Create integration zip
+        run: zip -r hass_console.zip custom_components/hass_console -x '*/__pycache__/*' -x '*.pyc'
+
+      - name: Upload zip to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: hass_console.zip
+          asset_name: hass_console.zip
+          tag: ${{ github.ref }}
+          overwrite: true

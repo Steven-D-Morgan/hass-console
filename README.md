@@ -1,6 +1,17 @@
-# HASS Console
+<p align="center">
+  <img src="icon.png" alt="HASS Console" width="180">
+</p>
 
-A Niagara-inspired alarm console and data logger for Home Assistant. Define alarm thresholds and scheduled log snapshots in YAML, acknowledge alarms from the dashboard, and filter everything from a Lovelace card with ALARM and LOG tabs.
+<h1 align="center">HASS Console</h1>
+
+<p align="center">
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge" alt="HACS"></a>
+  <a href="https://github.com/Steven-D-Morgan/hass-console/releases"><img src="https://img.shields.io/github/downloads/Steven-D-Morgan/hass-console/total?style=for-the-badge&color=41BDF5&label=downloads" alt="Total downloads"></a>
+  <a href="https://github.com/Steven-D-Morgan/hass-console/releases/latest"><img src="https://img.shields.io/github/downloads/Steven-D-Morgan/hass-console/latest/total?style=for-the-badge&color=41BDF5&label=latest%20release" alt="Latest release downloads"></a>
+  <a href="https://github.com/Steven-D-Morgan/hass-console/releases/latest"><img src="https://img.shields.io/github/v/release/Steven-D-Morgan/hass-console?style=for-the-badge&color=41BDF5" alt="Latest version"></a>
+</p>
+
+<p align="center">A Niagara-inspired alarm console and data logger for Home Assistant.<br>Define alarm thresholds and scheduled log snapshots in YAML, acknowledge alarms from the dashboard, and filter everything from a Lovelace card with ALARM and LOG tabs.</p>
 
 If you've used a Niagara AX/N4 alarm console, you know the value of a single pane of glass that shows every alarm and every logged data point across your facility. HASS Console brings that pattern to Home Assistant — threshold-based alarm evaluation with duration requirements, alarm acknowledgment, cron-scheduled data snapshots, severity classification, system categorization, and a sortable/filterable viewer — all driven by one YAML file.
 

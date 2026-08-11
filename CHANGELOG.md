@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here, newest first. Versions follow [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+Scan the table for an at-a-glance history, or jump to any version for the full details below.
+
+| Version | Date | Summary |
+|---------|------|---------|
+| [v2.6.0](#v260--2026-07-10) | 2026-07-10 | Local-time cron, real restorable entities, retention/rotation, acknowledge notes, Config Repairs |
+| [v2.5.2](#v252--2026-06-05) | 2026-06-05 | State-trigger duration fix; show/hide card tabs |
+| [v2.5.1](#v251--2026-06-05) | 2026-06-05 | HACS/Hassfest validation fixes |
+| [v2.5.0](#v250--2026-06-05) | 2026-06-05 | State triggers, AND conditions, theme, summary card, icon, HACS |
+| [v2.4.1](#v241--2026-06-05) | 2026-06-05 | Dedicated `/config/www/hass-console/` CSV folder |
+| [v2.4.0](#v240--2026-06-05) | 2026-06-05 | Custom target CSV files per point |
+| [v2.3.0](#v230--2026-06-05) | 2026-06-05 | Niagara-style alarm acknowledgment |
+| [v2.2.0](#v220--2026-06-05) | 2026-06-05 | Category column, clean timestamps, CSV auto-migration |
+| [v2.1.1](#v211--2026-06-05) | 2026-06-05 | Config-flow 500 fix (HA 2024.11+) |
+| [v2.1.0](#v210--2026-06-05) | 2026-06-05 | Web UI configuration (config + options flow) |
+| [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
+| [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
+| [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
 ---
 
 ## v2.6.0 — 2026-07-10
