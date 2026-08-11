@@ -1,9 +1,10 @@
 {
   "domain": "hass_console",
   "name": "HASS Console - Alarm & Log Engine",
+  "after_dependencies": ["lovelace"],
   "codeowners": ["@Steven-D-Morgan"],
   "config_flow": true,
-  "dependencies": ["frontend"],
+  "dependencies": ["http"],
   "documentation": "https://github.com/Steven-D-Morgan/hass-console",
   "integration_type": "service",
   "iot_class": "local_push",

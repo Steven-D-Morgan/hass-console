@@ -46,6 +46,9 @@ reliably.
 - **YAML-mode Lovelace:** an integration can't add resources there, so a log message lists
   the two URLs to add manually.
 - Removed the `add_extra_js_url` auto-load that didn't work.
+- Manifest/schema: declare the `http` dependency (used for serving the cards), reach
+  Lovelace via `after_dependencies`, and add a permissive `CONFIG_SCHEMA` — clears the
+  Hassfest validation errors.
 
 ### Changed files
 

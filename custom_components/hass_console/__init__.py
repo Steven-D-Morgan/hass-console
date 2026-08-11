@@ -53,6 +53,11 @@ SUPPORTED_PLATFORMS = {PLATFORM_NUMERIC, PLATFORM_STATE}
 FRONTEND_URL_BASE = "/hass_console_frontend"
 FRONTEND_CARDS = ("hass-console-card.js", "hass-console-summary-card.js")
 
+# The engine validates console.yaml itself (and raises Repairs issues for bad points),
+# so accept any mapping here — this keeps YAML mode working while satisfying Hassfest,
+# which requires a CONFIG_SCHEMA on integrations that implement async_setup.
+CONFIG_SCHEMA = vol.Schema({DOMAIN: dict}, extra=vol.ALLOW_EXTRA)
+
 
 # ──────────────────────────────────────────────────────────────────
 # Cron parsing
