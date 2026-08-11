@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v2.6.3](#v263--2026-08-11) | 2026-08-11 | Hassfest validation fixes (http dependency, CONFIG_SCHEMA) |
 | [v2.6.2](#v262--2026-08-11) | 2026-08-11 | Fix card auto-registration (register as a Lovelace resource) |
 | [v2.6.1](#v261--2026-08-11) | 2026-08-11 | Cards auto-register — no more manual Dashboards → Resources |
 | [v2.6.0](#v260--2026-07-10) | 2026-07-10 | Local-time cron, real restorable entities, retention/rotation, acknowledge notes, Config Repairs |
@@ -21,6 +22,27 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v2.6.3 — 2026-08-11
+
+### 🔧 Hassfest validation fixes
+
+No functional change to the cards or the alarm/log engine — 2.6.3 only clears CI-validation
+errors that 2.6.2 tripped:
+
+- Declare the `http` dependency (the integration imports `StaticPathConfig` from it to serve
+  the cards) and reach Lovelace via `after_dependencies` — fixes the Hassfest `[DEPENDENCIES]`
+  error.
+- Add a permissive `CONFIG_SCHEMA` (`{DOMAIN: dict}`, extra allowed). The engine still
+  validates `console.yaml` itself, so YAML-mode behaviour is unchanged; this only satisfies
+  Hassfest's `[CONFIG_SCHEMA]` requirement for integrations that implement `async_setup`.
+
+### Changed files
+
+- `custom_components/hass_console/manifest.json` — `http` dependency, `after_dependencies: lovelace`
+- `custom_components/hass_console/__init__.py` — `CONFIG_SCHEMA`
 
 ---
 
@@ -46,9 +68,6 @@ reliably.
 - **YAML-mode Lovelace:** an integration can't add resources there, so a log message lists
   the two URLs to add manually.
 - Removed the `add_extra_js_url` auto-load that didn't work.
-- Manifest/schema: declare the `http` dependency (used for serving the cards), reach
-  Lovelace via `after_dependencies`, and add a permissive `CONFIG_SCHEMA` — clears the
-  Hassfest validation errors.
 
 ### Changed files
 

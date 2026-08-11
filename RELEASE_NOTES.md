@@ -4,6 +4,17 @@ User-facing notes for each release, newest first. For the full change-by-change 
 
 ---
 
+## 2.6.3 — Hassfest validation fixes
+
+Passes Home Assistant's Hassfest validation cleanly. **No change to how the cards or the alarm/log engine behave** — 2.6.3 only fixes CI-validation errors that 2.6.2 tripped:
+
+- Declares the `http` dependency (used to serve the bundled cards).
+- Adds a `CONFIG_SCHEMA` — the engine still validates `console.yaml` itself, so YAML config is unaffected.
+
+Requires Home Assistant 2024.7+.
+
+---
+
 ## 2.6.2 — Fix: cards now actually auto-register
 
 2.6.1's auto-load didn't work — the cards showed a "Custom element not found" error and wouldn't render, because the loading mechanism defined them too early for the dashboard to see. 2.6.2 registers the cards as **Lovelace resources** (the mechanism the dashboard waits for), so they load reliably with no manual setup.
