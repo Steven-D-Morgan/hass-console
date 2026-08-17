@@ -64,7 +64,6 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         """Handle the user-initiated setup step."""
-        # Only one instance — the engine is a singleton
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
 

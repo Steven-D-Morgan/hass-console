@@ -53,15 +53,8 @@ SUPPORTED_PLATFORMS = {PLATFORM_NUMERIC, PLATFORM_STATE}
 FRONTEND_URL_BASE = "/hass_console_frontend"
 FRONTEND_CARDS = ("hass-console-card.js", "hass-console-summary-card.js")
 
-# The engine validates console.yaml itself (and raises Repairs issues for bad points),
-# so accept any mapping here — this keeps YAML mode working while satisfying Hassfest,
-# which requires a CONFIG_SCHEMA on integrations that implement async_setup.
 CONFIG_SCHEMA = vol.Schema({DOMAIN: dict}, extra=vol.ALLOW_EXTRA)
 
-
-# ──────────────────────────────────────────────────────────────────
-# Cron parsing
-# ──────────────────────────────────────────────────────────────────
 
 MONTH_NAMES = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -114,16 +107,13 @@ def cron_matches_now(cron_expr: str, now: datetime) -> bool:
         if now.month not in _parse_cron_field(month, 1, 12, MONTH_NAMES):
             return False
 
-        # Day-of-month / day-of-week follow standard (Vixie) cron semantics:
-        # when BOTH fields are restricted (not "*"), a match on EITHER fires;
-        # otherwise only the restricted field(s) must match.
         dom_restricted = dom.strip() != "*"
         dow_restricted = dow.strip() != "*"
 
         dow_vals = _parse_cron_field(dow, 0, 6, DOW_NAMES)
-        if 7 in dow_vals:               # accept 7 as Sunday
+        if 7 in dow_vals:
             dow_vals.add(0)
-        now_dow = now.isoweekday() % 7  # Mon=1..Sat=6, Sun=0
+        now_dow = now.isoweekday() % 7
 
         dom_ok = now.day in _parse_cron_field(dom, 1, 31)
         dow_ok = now_dow in dow_vals
@@ -142,10 +132,6 @@ def cron_matches_now(cron_expr: str, now: datetime) -> bool:
 def _gen_id() -> str:
     return uuid.uuid4().hex[:8]
 
-
-# ──────────────────────────────────────────────────────────────────
-# Condition evaluation helpers
-# ──────────────────────────────────────────────────────────────────
 
 def _check_numeric(state_val: str, above, below) -> bool:
     """Check if a numeric value exceeds above/below thresholds."""
@@ -172,10 +158,6 @@ def _check_state_match(new_state: str, old_state: str | None, to_val, from_val) 
             return False
     return True
 
-
-# ──────────────────────────────────────────────────────────────────
-# Engine
-# ──────────────────────────────────────────────────────────────────
 
 class HassConsoleEngine:
 
@@ -217,7 +199,6 @@ class HassConsoleEngine:
             len(self.points), len(self._log_files), len(self._alarm_files),
         )
 
-    # ── Path + lock helpers ──
 
     def _resolve_csv_path(self, target: str, default_path: Path) -> Path:
         if not target:
@@ -233,7 +214,6 @@ class HassConsoleEngine:
             self._file_locks[key] = lock
         return lock
 
-    # ── CSV file management ──
 
     def _ensure_csvs(self) -> None:
         for path in self._log_files:
@@ -286,8 +266,6 @@ class HassConsoleEngine:
                 )
                 continue
 
-            # Per-type required-field checks. Problems are recorded but the
-            # point is still registered so partial configs keep working.
             if pt == TYPE_LOG:
                 if not pcfg.get(CONF_CRON):
                     self._config_problems.append(f"'{name}': LOG point is missing 'cron'")
@@ -363,7 +341,6 @@ class HassConsoleEngine:
         else:
             ir.async_delete_issue(self.hass, DOMAIN, ISSUE_INVALID_CONFIG)
 
-    # ── Entities ──
 
     async def _register_entities(self) -> None:
         """Create one HA entity per configured point (LOG and ALARM).
@@ -383,13 +360,10 @@ class HassConsoleEngine:
         if entities:
             await self._component.async_add_entities(entities)
 
-    # ── Cron (LOG) ──
 
     async def _setup_cron_scanner(self) -> None:
         @callback
         def _tick(now):
-            # async_track_time_interval fires with a UTC time; cron expressions
-            # and log timestamps are evaluated in the user's local timezone.
             now = dt_util.as_local(now)
             for point in self.points.values():
                 if point["type"] != TYPE_LOG: continue
@@ -400,7 +374,6 @@ class HassConsoleEngine:
             async_track_time_interval(self.hass, _tick, timedelta(minutes=1))
         )
 
-    # ── Alarm listeners ──
 
     def _setup_alarm_listeners(self) -> None:
         for name, point in self.points.items():
@@ -428,7 +401,6 @@ class HassConsoleEngine:
                     for_d.get("seconds", 0)
                 ) if isinstance(for_d, dict) else 0
 
-                # Parse AND conditions (optional)
                 raw_conditions = trig.get("conditions", [])
                 conditions = []
                 for cond in raw_conditions:
@@ -444,10 +416,8 @@ class HassConsoleEngine:
                     "entity_id": target,
                     "duration": dur,
                     "conditions": conditions,
-                    # numeric_state fields
                     "above": trig.get(CONF_ABOVE, trig.get("above")),
                     "below": trig.get(CONF_BELOW, trig.get("below")),
-                    # state fields
                     "to_state": trig.get("to"),
                     "from_state": trig.get("from"),
                 }
@@ -489,7 +459,6 @@ class HassConsoleEngine:
                 else:
                     primary_ok = True
 
-            # Check AND conditions
             if primary_ok and a["conditions"]:
                 for cond in a["conditions"]:
                     if not self._check_condition(cond):
@@ -520,7 +489,6 @@ class HassConsoleEngine:
                     continue
                 elapsed = (now - a["triggered_at"]).total_seconds()
                 if elapsed >= a["duration"]:
-                    # Re-verify the condition is still true
                     entity_id = a["entity_id"]
                     state_obj = self.hass.states.get(entity_id)
                     if not state_obj or state_obj.state in ("unavailable", "unknown"):
@@ -541,7 +509,6 @@ class HassConsoleEngine:
                             still_ok = True
                         display_val = state_obj.state
 
-                    # Re-check AND conditions
                     if still_ok and a["conditions"]:
                         for cond in a["conditions"]:
                             if not self._check_condition(cond):
@@ -556,7 +523,6 @@ class HassConsoleEngine:
                         )
                         a["recorded"] = True
                     else:
-                        # Condition cleared between checks
                         a["active"] = False
                         a["triggered_at"] = None
 
@@ -575,7 +541,6 @@ class HassConsoleEngine:
         if new_s.state in ("unavailable", "unknown"):
             return
 
-        # ── Primary condition check based on platform ──
         platform = a["platform"]
         if platform == PLATFORM_NUMERIC:
             primary_ok = _check_numeric(new_s.state, a["above"], a["below"])
@@ -589,14 +554,12 @@ class HassConsoleEngine:
         else:
             return
 
-        # ── AND conditions — all must be true right now ──
         if primary_ok and a["conditions"]:
             for cond in a["conditions"]:
                 if not self._check_condition(cond):
                     primary_ok = False
                     break
 
-        # ── Duration tracking + recording ──
         now = dt_util.now()
         if primary_ok and not a["active"]:
             a["active"] = True
@@ -625,13 +588,11 @@ class HassConsoleEngine:
         if state_obj.state in ("unavailable", "unknown"):
             return False
 
-        # Numeric: above / below
         above = cond.get("above")
         below = cond.get("below")
         if above is not None or below is not None:
             return _check_numeric(state_obj.state, above, below)
 
-        # State: exact match
         state_val = cond.get("state")
         if state_val is not None:
             match_list = state_val if isinstance(state_val, list) else [str(state_val)]
@@ -639,7 +600,6 @@ class HassConsoleEngine:
 
         return True
 
-    # ── Record rows ──
 
     async def _record_log(self, point, now):
         src = point.get("source_entity")
@@ -697,7 +657,6 @@ class HassConsoleEngine:
         else:
             self.hass.states.async_set(point["entity_id"], state, attributes)
 
-    # ── CSV writers ──
 
     async def _write_log_row(self, row, target: Path | None = None):
         path = target or self._log_csv
@@ -719,7 +678,6 @@ class HassConsoleEngine:
                 writer.writeheader()
             writer.writerow({c: row.get(c, "") for c in cols})
 
-    # ── Acknowledge ──
 
     async def acknowledge_alarm(self, alarm_id: str, note: str = "") -> bool:
         for path in self._alarm_files:
@@ -775,7 +733,6 @@ class HassConsoleEngine:
             for row in rows:
                 writer.writerow({c: row.get(c, "") for c in cols})
 
-    # ── Retention / rotation ──
 
     def _setup_retention(self) -> None:
         """Prune old rows daily. Disabled entirely when both limits are 0."""
@@ -786,7 +743,6 @@ class HassConsoleEngine:
         def _tick(now):
             self.hass.async_create_task(self._prune())
 
-        # Run once shortly after startup, then daily.
         self.hass.async_create_task(self._prune())
         self._unsub_listeners.append(
             async_track_time_interval(self.hass, _tick, timedelta(hours=24))
@@ -816,7 +772,6 @@ class HassConsoleEngine:
             return
 
         def _keep(row) -> bool:
-            # Never drop an unacknowledged alarm, whatever its age.
             if is_alarm and not row.get("ack"):
                 return True
             if cutoff is None:
@@ -825,14 +780,13 @@ class HassConsoleEngine:
             try:
                 when = dt_util.as_local(datetime.strptime(ts, TIMESTAMP_FORMAT))
             except (ValueError, TypeError):
-                return True  # unparseable → keep (fail safe)
+                return True
             return when >= cutoff
 
         rows = [r for r in rows if _keep(r)]
 
         if self._max_rows > 0 and len(rows) > self._max_rows:
             if is_alarm:
-                # Keep every unacked alarm, then the newest acked rows up to cap.
                 unacked = [r for r in rows if not r.get("ack")]
                 acked = [r for r in rows if r.get("ack")]
                 room = max(self._max_rows - len(unacked), 0)
@@ -850,7 +804,6 @@ class HassConsoleEngine:
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
-        # Remove this engine's entities so a reload re-adds them cleanly.
         if self._component is not None:
             for ent in self._entities.values():
                 if ent.entity_id:
@@ -858,10 +811,6 @@ class HassConsoleEngine:
         self._entities.clear()
         ir.async_delete_issue(self.hass, DOMAIN, ISSUE_INVALID_CONFIG)
 
-
-# ──────────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────────
 
 def _load_yaml_sync(path):
     try:
@@ -908,12 +857,8 @@ async def _async_register_frontend(hass) -> None:
             ]
         )
     except RuntimeError:
-        pass  # already registered (e.g. on reload)
+        pass
 
-    # Register the cards as Lovelace resources — the mechanism the dashboard actually
-    # waits for. (add_extra_js_url loads too early / into the wrong registry, so the
-    # dashboard can't find the element: "Custom element not found".) Run in a background
-    # task so a slow resource store can't hold up setup.
     hass.async_create_task(_async_register_card_resources(hass))
 
 
@@ -934,15 +879,13 @@ async def _async_register_card_resources(hass) -> None:
         return
 
     try:
-        # Load existing resources BEFORE creating anything: calling async_create_item()
-        # on an unloaded collection wipes all existing resources (home-assistant/core#165767).
         if not getattr(resources, "loaded", False):
             await resources.async_load()
             resources.loaded = True
 
         try:
             version = str((await async_get_integration(hass, DOMAIN)).version)
-        except Exception:  # pragma: no cover - best-effort cache-buster
+        except Exception:
             version = "0"
 
         items = resources.async_items()
@@ -962,7 +905,7 @@ async def _async_register_card_resources(hass) -> None:
                 await resources.async_update_item(
                     existing["id"], {"res_type": "module", "url": desired}
                 )
-    except Exception as err:  # never crash setup, never risk the resource store
+    except Exception as err:
         _LOGGER.warning(
             "Could not auto-register HASS Console card resources (%s); add them "
             "manually if the cards don't appear: %s",
@@ -970,10 +913,6 @@ async def _async_register_card_resources(hass) -> None:
             manual_hint,
         )
 
-
-# ──────────────────────────────────────────────────────────────────
-# Setup — YAML mode (legacy)
-# ──────────────────────────────────────────────────────────────────
 
 async def async_setup(hass, config):
     _register_services(hass)
@@ -990,10 +929,6 @@ async def async_setup(hass, config):
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _start)
     return True
 
-
-# ──────────────────────────────────────────────────────────────────
-# Setup — Config Entry mode (UI)
-# ──────────────────────────────────────────────────────────────────
 
 async def async_setup_entry(hass, entry):
     settings = {**entry.data, **entry.options}
@@ -1026,10 +961,6 @@ async def async_unload_entry(hass, entry):
 async def _async_update_listener(hass, entry):
     await hass.config_entries.async_reload(entry.entry_id)
 
-
-# ──────────────────────────────────────────────────────────────────
-# Services
-# ──────────────────────────────────────────────────────────────────
 
 def _register_services(hass):
     if hass.services.has_service(DOMAIN, "write_log"):

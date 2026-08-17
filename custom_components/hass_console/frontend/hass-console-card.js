@@ -23,7 +23,6 @@ setConfig(c){
 this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30,
 showAlarm:c.show_alarm!==false,showLog:c.show_log!==false};
 this._theme=c.theme||"auto";
-// Default to whichever tab is enabled
 if(!this._c.showAlarm&&this._c.showLog)this._tab="LOG";
 if(this._c.showAlarm&&!this._c.showLog)this._tab="ALARM";
 }
@@ -31,7 +30,6 @@ if(this._c.showAlarm&&!this._c.showLog)this._tab="ALARM";
 set hass(h){this._hass=h;if(!this._init){this._init=true;this._render();this._fetch();this._startRefresh()}}
 
 _isDark(){if(this._theme==="dark")return true;if(this._theme==="light")return false;
-// auto: check HA theme
 const bg=getComputedStyle(document.documentElement).getPropertyValue('--primary-background-color').trim();
 if(!bg)return true;
 const m=bg.match(/\d+/g);if(!m||m.length<3)return true;

@@ -19,7 +19,6 @@ class HassConsolePointEntity(RestoreEntity):
 
     def __init__(self, point: dict[str, Any]) -> None:
         self._point = point
-        # Preserve the documented entity ID on the custom hass_console domain.
         self.entity_id = point["entity_id"]
         self._attr_unique_id = (
             f"{DOMAIN}_{point['type'].lower()}_{point['header'].lower()}"
@@ -43,7 +42,6 @@ class HassConsolePointEntity(RestoreEntity):
     def update_value(self, state: str, attributes: dict[str, Any]) -> None:
         """Set the current state + attributes and write to HA."""
         self._state = state
-        # friendly_name comes from _attr_name, so don't duplicate it here.
         self._attrs = {k: v for k, v in attributes.items() if k != "friendly_name"}
         self.async_write_ha_state()
 
