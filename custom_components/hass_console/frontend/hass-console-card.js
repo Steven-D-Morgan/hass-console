@@ -1,5 +1,5 @@
 /**
- * HASS Console Card v2.6.3
+ * HASS Console Card v3.0.0-rc1
  *
  * CONFIG:
  *   type: custom:hass-console-card

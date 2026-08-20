@@ -1,5 +1,5 @@
 /**
- * HASS Console Summary Card v2.6.3
+ * HASS Console Summary Card v3.0.0-rc1
  *
  * Minimalist alarm severity gauges. Three numbers. That's it.
  *
