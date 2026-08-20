@@ -9,7 +9,7 @@
  *   theme: auto
  *   refresh_interval: 30
  */
-const SVER = "2.6.3";
+const SVER = "3.0.0-rc1";
 
 class HassConsoleSummaryCard extends HTMLElement {
   constructor() {

@@ -4,9 +4,9 @@
     "step": {
       "user": {
         "title": "Set up HASS Console",
-        "description": "Tell HASS Console where to find your console.yaml and where to write the CSV log files. The console.yaml file must already exist — see the README for the format. The CSV files will be created automatically on first run.",
+        "description": "Tell HASS Console where to write the CSV log files. Add your LOG and ALARM points from the integration card after setup — the Console YAML path is optional and only used for legacy console.yaml configs.",
         "data": {
-          "console_yaml": "Console YAML path",
+          "console_yaml": "Console YAML path (optional, legacy)",
           "alarm_csv": "Alarm CSV output path",
           "log_csv": "Log CSV output path",
           "retention_days": "Retention (days, 0 = keep forever)",
@@ -15,7 +15,6 @@
       }
     },
     "error": {
-      "yaml_required": "Console YAML path is required",
       "yaml_not_found": "Console YAML file not found at the given path",
       "path_required": "Path is required",
       "parent_not_writable": "Parent directory does not exist and could not be created"
@@ -30,7 +29,7 @@
         "title": "HASS Console settings",
         "description": "Change file paths and retention. Changes apply immediately — no restart needed.",
         "data": {
-          "console_yaml": "Console YAML path",
+          "console_yaml": "Console YAML path (optional, legacy)",
           "alarm_csv": "Alarm CSV output path",
           "log_csv": "Log CSV output path",
           "retention_days": "Retention (days, 0 = keep forever)",
@@ -39,16 +38,140 @@
       }
     },
     "error": {
-      "yaml_required": "Console YAML path is required",
       "yaml_not_found": "Console YAML file not found at the given path",
       "path_required": "Path is required",
       "parent_not_writable": "Parent directory does not exist and could not be created"
+    }
+  },
+  "config_subentries": {
+    "log_point": {
+      "initiate_flow": {
+        "user": "Add LOG point",
+        "reconfigure": "Edit LOG point"
+      },
+      "entry_type": "LOG point",
+      "step": {
+        "user": {
+          "title": "Add LOG point",
+          "description": "A LOG point reads an entity's state on a cron schedule and writes it to the log CSV.",
+          "data": {
+            "name": "Point name (uppercase, becomes part of the entity ID)",
+            "cron": "Cron schedule (5 fields, e.g. \"0 0 * * *\" for daily midnight)",
+            "entity": "Entity to snapshot",
+            "category": "Category (optional — HVAC, E-METER, GPS, …)",
+            "note": "Note (optional — static text in the Note column)",
+            "target_csv": "Custom CSV file (optional — bare filename or absolute path)"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit LOG point",
+          "description": "Rename or update this LOG point. Changes take effect immediately.",
+          "data": {
+            "name": "Point name",
+            "cron": "Cron schedule",
+            "entity": "Entity to snapshot",
+            "category": "Category",
+            "note": "Note",
+            "target_csv": "Custom CSV file"
+          }
+        }
+      },
+      "error": {
+        "name_required": "Name is required",
+        "name_taken": "Another point already uses this name",
+        "cron_required": "Cron expression is required",
+        "entity_required": "Entity is required"
+      }
+    },
+    "alarm_point": {
+      "initiate_flow": {
+        "user": "Add ALARM point",
+        "reconfigure": "Edit ALARM point"
+      },
+      "entry_type": "ALARM point",
+      "step": {
+        "user": {
+          "title": "Add ALARM point",
+          "description": "An ALARM point watches entities in real time and fires when a condition holds for a sustained duration. First, name and classify it — you'll add triggers on the next screen.",
+          "data": {
+            "name": "Point name (uppercase, becomes part of the entity ID)",
+            "class": "Severity",
+            "category": "Category (optional — HVAC, SECURITY, E-METER, …)",
+            "entity": "Primary entity (optional — informational)",
+            "note": "Note (optional — static text in the Note column)",
+            "target_csv": "Custom CSV file (optional — bare filename or absolute path)"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit ALARM point",
+          "description": "Update the header for this ALARM point, then edit its triggers on the next screen.",
+          "data": {
+            "name": "Point name",
+            "class": "Severity",
+            "category": "Category",
+            "entity": "Primary entity",
+            "note": "Note",
+            "target_csv": "Custom CSV file"
+          }
+        },
+        "triggers": {
+          "title": "Triggers",
+          "description": "An ALARM point needs at least one trigger. Add, edit, or remove triggers below, then save.",
+          "data": {
+            "next_step": "Next"
+          }
+        },
+        "add_trigger": {
+          "title": "Add trigger",
+          "description": "A trigger fires when its primary condition is met. Use numeric_state for above/below thresholds, or state for exact matches. The 'for' duration is how long the condition must hold before the alarm is recorded (0 = fire immediately).",
+          "data": {
+            "platform": "Trigger type",
+            "alias": "Alias (optional — shown in the Trigger column and in this list)",
+            "entity_id": "Entity to monitor",
+            "above": "Above (numeric_state — leave blank if using below)",
+            "below": "Below (numeric_state — leave blank if using above)",
+            "to": "State matches (state — comma-separated for multi-match)",
+            "from": "From state (state, optional — comma-separated)",
+            "for_hours": "For — hours",
+            "for_minutes": "For — minutes",
+            "for_seconds": "For — seconds"
+          }
+        },
+        "edit_trigger": {
+          "title": "Edit trigger",
+          "description": "Update this trigger's settings. Any AND conditions already stored on this trigger are preserved (edit them in console.yaml or wait for the upcoming conditions editor).",
+          "data": {
+            "platform": "Trigger type",
+            "alias": "Alias",
+            "entity_id": "Entity to monitor",
+            "above": "Above",
+            "below": "Below",
+            "to": "State matches",
+            "from": "From state",
+            "for_hours": "For — hours",
+            "for_minutes": "For — minutes",
+            "for_seconds": "For — seconds"
+          }
+        }
+      },
+      "error": {
+        "name_required": "Name is required",
+        "name_taken": "Another point already uses this name",
+        "entity_required": "Entity is required",
+        "numeric_needs_threshold": "Numeric triggers need an 'above' or 'below' value",
+        "state_needs_to": "State triggers need at least one 'to' value",
+        "at_least_one_trigger": "An ALARM point needs at least one trigger before it can be saved"
+      }
     }
   },
   "issues": {
     "invalid_config": {
       "title": "HASS Console: {count} invalid config point(s)",
       "description": "Some points in your console.yaml were skipped or incomplete and won't work as expected:\n\n{problems}\n\nFix them in console.yaml, then reload HASS Console (integration menu → Reload, or the hass_console.reload service)."
+    },
+    "yaml_deprecated": {
+      "title": "HASS Console: console.yaml is deprecated",
+      "description": "{count} point(s) are still defined only in console.yaml. YAML setup is deprecated as of 3.0.0 and will be removed in a future release.\n\nMigrate to UI-managed points: Settings → Devices & Services → HASS Console → ADD → LOG point or ALARM point.\n\nUI-managed points appear alongside YAML points on the integration card; once every point is added through the UI, remove them from console.yaml (or delete the file) and this warning clears."
     }
   }
 }

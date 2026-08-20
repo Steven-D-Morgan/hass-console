@@ -11,13 +11,15 @@
   <a href="https://github.com/Steven-D-Morgan/hass-console/releases/latest"><img src="https://img.shields.io/github/v/release/Steven-D-Morgan/hass-console?style=for-the-badge&color=41BDF5" alt="Latest version"></a>
 </p>
 
-<p align="center">A Niagara-inspired alarm console and data logger for Home Assistant.<br>Define alarm thresholds and scheduled log snapshots in YAML, acknowledge alarms from the dashboard, and filter everything from a Lovelace card with ALARM and LOG tabs.</p>
+<p align="center">A Niagara-inspired alarm console and data logger for Home Assistant.<br>Add alarm thresholds and scheduled log snapshots from the UI (just like automations), acknowledge alarms from the dashboard, and filter everything from a Lovelace card with ALARM and LOG tabs.</p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=STbzrAZEZv0"><img src="https://img.shields.io/badge/YouTube-Watch%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube"></a>
 </p>
 
-If you've used a Niagara AX/N4 alarm console, you know the value of a single pane of glass that shows every alarm and every logged data point across your facility. HASS Console brings that pattern to Home Assistant — threshold-based alarm evaluation with duration requirements, alarm acknowledgment, cron-scheduled data snapshots, severity classification, system categorization, and a sortable/filterable viewer — all driven by one YAML file.
+If you've used a Niagara AX/N4 alarm console, you know the value of a single pane of glass that shows every alarm and every logged data point across your facility. HASS Console brings that pattern to Home Assistant — threshold-based alarm evaluation with duration requirements, alarm acknowledgment, cron-scheduled data snapshots, severity classification, system categorization, and a sortable/filterable viewer — with points you add, edit, and delete from the Home Assistant UI.
+
+> **New in 3.0.0:** points (LOG and ALARM) live as **config subentries** on the integration, so you can add / edit / delete them from Settings → Devices & Services → HASS Console — the same UX as automations. `console.yaml` still works but is **deprecated** and will be removed in a future major release.
 
 ---
 
@@ -26,7 +28,8 @@ If you've used a Niagara AX/N4 alarm console, you know the value of a single pan
 - [Architecture Overview](#architecture-overview)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Console.yaml Reference](#consoleyaml-reference)
+- [Adding Points from the UI](#adding-points-from-the-ui)
+- [Console.yaml Reference (legacy)](#consoleyaml-reference-legacy)
   - [LOG Points](#log-points--scheduled-data-snapshots)
   - [ALARM Points](#alarm-points--threshold-based-alerts)
 - [Alarm Acknowledgment](#alarm-acknowledgment)
@@ -49,7 +52,8 @@ HASS Console is a custom integration (domain: `hass_console`) with three parts:
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  Settings → Devices & Services → HASS Console                │
-│    or  configuration.yaml:  hass_console: !include console.yaml
+│    Points added from the UI (config subentries)              │
+│    Legacy YAML: configuration.yaml → hass_console:           │
 └──────────────┬───────────────────────────────────────────────┘
                │
                ▼
@@ -84,12 +88,12 @@ HASS Console is a custom integration (domain: `hass_console`) with three parts:
 
 ## Installation
 
-Requires Home Assistant **2024.7 or newer**. See [simple-setup.md](simple-setup.md) for the 5-minute walkthrough. The short version:
+Requires Home Assistant **2025.3 or newer** (needed for config subentries). See [simple-setup.md](simple-setup.md) for the 5-minute walkthrough. The short version:
 
 1. Copy `custom_components/hass_console/` → `/config/custom_components/hass_console/` (or install via HACS as a custom repository)
-2. Create `/config/console.yaml` with your alarm and log points
-3. Restart Home Assistant
-4. **Settings → Devices & Services → + Add Integration → HASS Console**
+2. Restart Home Assistant
+3. **Settings → Devices & Services → + Add Integration → HASS Console**
+4. On the integration card, click **ADD** to add LOG points (scheduled snapshots) and ALARM points (threshold alerts)
 5. Add the **HASS Console Card** (and optional **Summary Card**) to a dashboard
 
 The Lovelace cards are bundled with the integration and **register themselves** — on a standard (storage-mode) dashboard the integration adds them to **Settings → Dashboards → Resources** for you, so you don't copy anything to `/config/www/` or add resources by hand. If your Lovelace is in **YAML mode**, Home Assistant won't let an integration add resources — add the two `/hass_console_frontend/…` URLs (listed in the HA log) as `JavaScript Module` resources yourself. Both cards then appear in the card picker after a refresh.
@@ -100,38 +104,22 @@ Re-copy `custom_components/hass_console/` over the old folder (or update through
 
 **Upgrading from 2.6.0 or earlier:** remove the two HASS Console entries from **Settings → Dashboards → Resources** — the integration now loads the cards for you. If you leave them, the old (pre-2.6.1) card file is unguarded, so it can log an "already defined" error in the browser console and may keep serving a stale cached copy; your dashboard keeps working either way. You can also delete the old `/config/www/hass-console-card.js` and `hass-console-summary-card.js` files.
 
-Existing users with `hass_console: !include console.yaml` in `configuration.yaml` can continue using YAML setup — both modes are supported.
+**Upgrading from 2.x:** existing `console.yaml` points keep working. A Repairs issue appears listing how many points are still YAML-only; migrate them by adding each one through the UI (Settings → Devices & Services → HASS Console → **ADD**) and then remove them from `console.yaml`. UI-added points always take precedence over a same-named YAML point during the transition. YAML support will be removed in a future major release.
 
 ---
 
 ## Quick Start
 
-Minimum viable `console.yaml`:
+1. **Install and add the integration** (see [Installation](#installation)).
+2. **Add a LOG point** — Settings → Devices & Services → HASS Console → **ADD** → **LOG point**. Fill in:
+   - **Name:** `DAILY_KWH`
+   - **Cron schedule:** `0 0 * * *`
+   - **Entity:** `sensor.energy_meter_kwh`
+   - **Category:** `E-METER`
+   - **Note:** `Daily kWh snapshot at midnight`
+3. **Add an ALARM point** — same menu → **ALARM point**. On the header form fill in name/class/category, then on the triggers step click **Add trigger**, pick **Numeric threshold**, set entity + `above: 80` + `for: 5 minutes`, save.
 
-```yaml
-DAILY_KWH:
-  type: LOG
-  cron: "0 0 * * *"
-  entity: sensor.energy_meter_kwh
-  category: E-METER
-  note: "Daily kWh snapshot at midnight"
-
-SERVER_ROOM_TEMP:
-  type: ALARM
-  class: "01"
-  category: HVAC
-  entity: sensor.server_room_temperature
-  note: "Server room overheat"
-  trigger:
-    - alias: "Above 80°F for 5 min"
-      platform: numeric_state
-      entity_id: sensor.server_room_temperature
-      above: 80
-      for:
-        minutes: 5
-```
-
-After restarting HA, you'll have:
+You'll have:
 - Entity `hass_console.log_daily_kwh` — updates at midnight with the meter's value
 - Entity `hass_console.alarm_server_room_temp` — goes to "ALARM" when triggered
 - A row in `logs.csv` every midnight
@@ -149,7 +137,42 @@ data:
 
 ---
 
-## Console.yaml Reference
+## Adding Points from the UI
+
+Every LOG or ALARM point is a **subentry** on the HASS Console integration. On the integration card in Settings → Devices & Services → HASS Console:
+
+- **ADD** → **Add LOG point** or **Add ALARM point** creates a new one.
+- Click any existing point → **Configure** to edit it. Rename, retarget, or change the trigger list — changes take effect immediately.
+- The **⋮** menu on a point deletes it.
+
+### LOG point form
+
+One form: name, cron expression, entity, and optional category / note / custom target CSV. See [Cron Reference](#cron-reference) for the schedule syntax.
+
+### ALARM point form
+
+Two steps.
+
+1. **Header** — name, severity class (01 Critical, 02 Major, 03 Minor, or custom), optional category / primary entity / note / custom target CSV.
+2. **Triggers** — an ALARM point needs at least one trigger. Add, edit, or delete triggers from this screen. Each trigger has:
+   - **Trigger type:** numeric threshold (`above` / `below`) or state match (`to` / `from`).
+   - **Entity to monitor.**
+   - **Alias** (optional, shown in the Trigger column of the alarm card).
+   - **For** duration (hours / minutes / seconds) — how long the condition must hold before recording.
+
+Multiple triggers on one ALARM point behave as OR — any trigger firing records the alarm.
+
+> **AND conditions** (a trigger that only fires when a *second* entity is also in a certain state) are stored on the trigger data model but not yet editable from the UI in 3.0.0-rc1. Triggers imported from `console.yaml` with `conditions:` keep them intact — the UI preserves conditions on edit. A conditions editor is on the roadmap.
+
+### Reload
+
+Settings → Devices & Services → HASS Console → **⋮ → Reload** re-reads every subentry and any legacy YAML. Editing or deleting a subentry reloads the engine automatically.
+
+---
+
+## Console.yaml Reference (legacy)
+
+> `console.yaml` still works, but is **deprecated** as of 3.0.0 and will be removed in a future major release. New users should add points from the UI ([above](#adding-points-from-the-ui)); existing users should migrate at their own pace — a Repairs issue lists how many YAML-only points remain.
 
 Every top-level key defines a **point** — a named data source to watch. The key name becomes part of the entity ID. Each point must have a `type` of either `LOG` or `ALARM`.
 
@@ -871,7 +894,7 @@ service: hass_console.acknowledge_all
 
 ### hass_console.reload
 
-Reload the engine — re-reads `console.yaml` and restarts all listeners. No HA restart needed.
+Reload the engine — re-reads every UI subentry and any legacy `console.yaml`, then restarts all listeners. No HA restart needed. (Editing or deleting a subentry reloads automatically, so you usually don't need to call this.)
 
 ```yaml
 service: hass_console.reload
@@ -1148,7 +1171,7 @@ logger:
 
 **ACK button not working** — The card calls `hass_console.acknowledge_alarm` via the HA service API. Verify the service is registered in Developer Tools → Services.
 
-**Reloading after config changes** — Use the ⋮ → Reload menu on the integration card, or call `hass_console.reload` from Developer Tools → Services.
+**Reloading after config changes** — Editing or deleting a UI point reloads the engine automatically. For `console.yaml` edits, use the ⋮ → Reload menu on the integration card, or call `hass_console.reload` from Developer Tools → Services.
 
 ---
 

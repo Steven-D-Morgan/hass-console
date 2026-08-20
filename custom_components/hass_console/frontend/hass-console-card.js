@@ -12,7 +12,7 @@
  *   show_alarm: true     # show the Alarm tab (default true)
  *   show_log: true       # show the Log tab (default true)
  */
-const VER="2.6.3";
+const VER="3.0.0-rc1";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{

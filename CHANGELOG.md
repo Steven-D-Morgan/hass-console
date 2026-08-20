@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.0.0-rc1](#v300-rc1--2026-08-20) | 2026-08-20 | Points managed as UI subentries; YAML deprecated; HA 2025.3+ |
 | [v2.6.3](#v263--2026-08-11) | 2026-08-11 | Hassfest validation fixes (http dependency, CONFIG_SCHEMA) |
 | [v2.6.2](#v262--2026-08-11) | 2026-08-11 | Fix card auto-registration (register as a Lovelace resource) |
 | [v2.6.1](#v261--2026-08-11) | 2026-08-11 | Cards auto-register — no more manual Dashboards → Resources |
@@ -22,6 +23,59 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v3.0.0-rc1 — 2026-08-20
+
+### 🎉 Points managed from the UI
+
+Every LOG and ALARM point is now a **config subentry** on the HASS Console integration entry — add, edit, and delete points from Settings → Devices & Services → HASS Console, the same UX as automations or helpers. `console.yaml` still works but is **deprecated** and will be removed in a future major release.
+
+### ➕ Added
+
+- **`LogPointSubentryFlow`** — one-form subentry flow for LOG points (name, cron, entity, category, note, target CSV).
+- **`AlarmPointSubentryFlow`** — multi-step subentry flow for ALARM points:
+  1. Header form (name, class, category, primary entity, note, target CSV).
+  2. Triggers step with iterative **Add / Edit / Delete** per trigger.
+  3. Trigger form with platform (numeric threshold or state match), entity, above/below or to/from, `for:` duration (hours/minutes/seconds), and alias.
+- **AND `conditions` are preserved on edit** — the trigger editor does not yet expose a conditions form, but any conditions imported from `console.yaml` are round-tripped losslessly on trigger edits so the future conditions UI slots in on top without a data migration.
+- **YAML deprecation Repairs issue** — a warning-severity issue lists how many points are still defined only in `console.yaml`, steering users to the UI. Auto-clears once every YAML point has a matching subentry.
+
+### ⚙️ Changed
+
+- **Minimum Home Assistant is now 2025.3** — required for `ConfigSubentryFlow`.
+- **`console.yaml` path is now optional** on the config / options form. Leave it blank if all points are UI-managed.
+- **Engine reads points from subentries and YAML together** — YAML points are loaded first, then UI subentries `.update()` on top so a same-named subentry always wins. Editing or deleting a subentry reloads the engine automatically.
+- **Point-platform constants moved to `const.py`** (`PLATFORM_NUMERIC`, `PLATFORM_STATE`, `SUPPORTED_PLATFORMS`) so the config flow can validate triggers without importing from the engine module.
+- **Version guard workflow** widened to accept PEP440/semver pre-release suffixes on CHANGELOG headings.
+
+### 🗓️ Deprecated
+
+- **`console.yaml`.** Still parsed and merged with UI subentries for compatibility, but slated for removal in a future major release. Users are encouraged to re-create each point through the UI (**ADD** button on the integration card) and then remove them from `console.yaml`.
+- **`configuration.yaml: hass_console: !include console.yaml`** setup mode is still recognised on YAML-mode installs but is on the same deprecation timeline.
+
+### ⬆️ Upgrading from 2.6.x
+
+1. Update the integration (HACS or manual copy) and restart HA.
+2. Confirm the CSV paths on the HASS Console setup form (they are unchanged).
+3. Check the Repairs card — it will list how many YAML-only points remain. Add each one through **Settings → Devices & Services → HASS Console → ADD**; the equivalent YAML entry can then be deleted from `console.yaml`.
+4. Same-named UI points always take precedence over YAML during the transition, so you can migrate at your own pace without duplicate rows.
+
+Existing CSV files and acknowledgment state are untouched.
+
+### Changed files
+
+- `custom_components/hass_console/const.py` — subentry types, deprecation issue key, platform constants moved from `__init__.py`.
+- `custom_components/hass_console/config_flow.py` — new `LogPointSubentryFlow` and `AlarmPointSubentryFlow`; YAML path made optional.
+- `custom_components/hass_console/__init__.py` — merge subentries with YAML in `async_setup_entry`; raise the `yaml_deprecated` Repairs issue.
+- `custom_components/hass_console/strings.json` + `translations/en.json` — subentry flow labels and error strings, deprecation issue text.
+- `custom_components/hass_console/manifest.json` — version `3.0.0-rc1`.
+- `custom_components/hass_console/frontend/hass-console-card.js` — `VER` bumped.
+- `custom_components/hass_console/frontend/hass-console-summary-card.js` — `SVER` bumped.
+- `hacs.json` — `homeassistant: "2025.3.0"`.
+- `.github/workflows/version-guard.yaml` — CHANGELOG regex now accepts pre-release suffixes.
+- `README.md`, `simple-setup.md`, `ROAD_MAP.md`, `RELEASE_NOTES.md` — documentation updated for the UI-first workflow and YAML deprecation.
 
 ---
 

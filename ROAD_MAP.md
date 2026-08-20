@@ -12,6 +12,8 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## ✅ Recently Shipped (for context)
 
+- **v3.0.0-rc1** — points (LOG and ALARM) are now managed as **config subentries** on the integration — add/edit/delete from Settings → Devices & Services → HASS Console, same UX as automations. Multi-trigger ALARM flow (iterative add/edit/delete). `console.yaml` deprecated with a Repairs issue steering users to the UI. Minimum HA bumped to 2025.3 (needed for `ConfigSubentryFlow`). Standardized on `X.Y.Z-rcN` pre-release tags.
+- **v2.6.3** — Hassfest validation fixes (`http` dependency, permissive `CONFIG_SCHEMA`).
 - **v2.6.2** — fix card auto-registration: register the cards as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see).
 - **v2.6.1** — bundle the cards inside the integration and serve them; minimum HA bumped to 2024.7. (Auto-registration didn't work reliably until 2.6.2.)
 - **v2.6.0** — local-time cron + OR day-rule + name aliases, real restorable `hass_console.*` entities, opt-in retention/rotation (unacknowledged alarms never pruned), acknowledge notes, Config Repairs for invalid `console.yaml`.
@@ -22,11 +24,14 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## 🎯 Next Up
 
-- [x] **Auto-register the Lovelace cards from the integration** `high · med` — today users must copy `hass-console-card.js` + `hass-console-summary-card.js` into `/config/www/` and add two Lovelace **Resources** by hand, then bump a cache-buster on every update. Bundle the cards inside `custom_components/hass_console/` (so HACS ships them), serve them with `async_register_static_paths`, and auto-load them via `frontend.add_extra_js_url` with a `?v={manifest_version}` query — no manual Resources entry. _The #1 friction for new users._ **✅ Shipped in 2.6.1, fixed in 2.6.2** — the cards are registered as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see the element).
-- [x] **Single-source the version + cut a clean stable 2.6.0** `high · small` — **✅ Shipped.** manifest/card/CHANGELOG reconciled to one version and a clean stable `2.6.0` tag published, so default HACS users (beta toggle off) now receive the 2.6.0 feature set instead of being stuck on 2.5.2.
-- [x] **Release-time version guard** `med · small` — a job that fails if `manifest.json` version ≠ tag ≠ CHANGELOG heading ≠ card `VER`/summary `SVER`, so they can never drift again. **✅ Shipped** as `.github/workflows/version-guard.yaml` (runs on `release: published`, PRs to main, and manual dispatch).
+- [ ] **UI editor for AND `conditions`** `high · med` — 3.0.0-rc1 lets users add/edit/delete triggers from the UI, but AND `conditions` on a trigger are still YAML-only. Data model already reserves the slot and the flow preserves conditions across trigger edits, so this is UI work only: a nested "add condition" sub-step on the trigger form. Reuses the same iterative pattern as the trigger list.
+- [ ] **One-click YAML → subentries import** `high · med` — the 3.0.0-rc1 Repairs issue asks users to re-enter YAML points through the UI. A fixable Repairs flow (or a service like `hass_console.import_yaml_points`) that creates one subentry per YAML point would remove the manual step. Non-trivial because the "import wizard" needs to preview and dedupe against existing subentries.
+- [ ] **Remove `console.yaml` support** `med · large` — once import and the conditions editor land, YAML setup can be dropped in a future major (probably `4.0`). The engine's point-map input shape stays the same; the removal is deleting `_load_yaml_sync`, the CONFIG_SCHEMA branch of `async_setup`, and the YAML path field from the config/options forms.
+- [x] **Auto-register the Lovelace cards from the integration** `high · med` — **✅ Shipped in 2.6.1, fixed in 2.6.2.**
+- [x] **Single-source the version + cut a clean stable 2.6.0** `high · small` — **✅ Shipped.**
+- [x] **Release-time version guard** `med · small` — **✅ Shipped** as `.github/workflows/version-guard.yaml`. Updated in 3.0.0-rc1 to accept PEP440/semver pre-release suffixes on CHANGELOG headings.
+- [x] **Consistent tag scheme** `low · small` — **✅ Standardized in 3.0.0-rc1** on `vX.Y.Z` for releases and `vX.Y.Z-rcN` / `vX.Y.Z-bN` for pre-releases.
 - [ ] **`.gitignore` + drop committed bytecode** `med · small` — `custom_components/hass_console/__pycache__/*.pyc` (py3.14) is tracked and would otherwise ship to every user. Add a `.gitignore` and `git rm` the tracked `.pyc`.
-- [ ] **Consistent tag scheme** `low · small` — tags mix unprefixed semver (`2.5.2`), non-semver (`2.6.0_BETA`), and PEP440 beta (`v2.6.0b1`). Standardize on one convention going forward.
 
 ---
 
@@ -62,4 +67,4 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ---
 
-_Last updated: 2026-08-11. Ratings are guidance, not gospel — revisit as the project changes._
+_Last updated: 2026-08-20. Ratings are guidance, not gospel — revisit as the project changes._

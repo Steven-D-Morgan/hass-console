@@ -2,17 +2,13 @@
 
 A step-by-step guide to get HASS Console running. Total time: ~5 minutes.
 
-There are **two ways to set up** the integration:
-- **UI Mode (recommended)** — configure via Settings → Devices & Integrations
-- **YAML Mode (legacy)** — add `hass_console:` to configuration.yaml
-
-Both modes are supported and use the same `console.yaml` for defining alarm and log points.
+**As of 3.0.0**, points are added from the UI (Settings → Devices & Services → HASS Console → ADD) — same UX as automations. `console.yaml` still works but is deprecated and will be removed in a future major release.
 
 ---
 
 ## What You Need
 
-- Home Assistant (2024.7 or newer)
+- Home Assistant (2025.3 or newer)
 - Access to your HA config directory (File Editor add-on, SSH, Samba, etc.)
 
 ---
@@ -39,68 +35,63 @@ If `custom_components/` doesn't exist yet, create it. The Lovelace cards ship **
 
 ---
 
-## Step 3 — Create console.yaml
-
-Create `/config/console.yaml` with at least one point. Minimal example:
-
-```yaml
-# ─── LOG EXAMPLE ───
-DAILY_KWH:
-  type: LOG
-  cron: "0 0 * * *"
-  entity: sensor.energy_meter_kwh
-  note: "Daily kWh snapshot at midnight"
-
-
-# ─── ALARM EXAMPLE ───
-TEMPERATURE_ALARM:
-  type: ALARM
-  class: "01"
-  entity: sensor.network_closet_temperature
-  note: "Network closet overheat"
-  trigger:
-    - alias: "Above 78°F for 10 min"
-      platform: numeric_state
-      entity_id: sensor.network_closet_temperature
-      above: 78
-      for:
-        minutes: 10
-```
-
----
-
-## Step 4 — Restart Home Assistant
+## Step 3 — Restart Home Assistant
 
 Settings → System → Restart. A full restart is required because this is a custom integration.
 
 ---
 
-## Step 5 — Set Up the Integration
-
-### Option A — UI Mode (Recommended)
+## Step 4 — Add the Integration
 
 1. Go to **Settings → Devices & Services**
 2. Click **+ Add Integration** (bottom right)
 3. Search for **HASS Console**
-4. Confirm the three paths (defaults are usually correct):
-   - **Console YAML path** — `/config/console.yaml`
+4. On the setup form, confirm the CSV paths (defaults are usually correct):
    - **Alarm CSV output path** — `/config/www/hass-console/alarms.csv`
    - **Log CSV output path** — `/config/www/hass-console/logs.csv`
+   - **Console YAML path** — leave blank if you're not using the legacy YAML file
 5. Click **Submit**
 
-You'll see a HASS Console card on the Integrations page with a **Configure** button (to change paths later) and a **⋮ → Reload** option.
+You'll see a HASS Console card on the Integrations page with an **ADD** button (for new points), a **Configure** button (to change paths later), and a **⋮ → Reload** option.
 
-### Option B — YAML Mode (Legacy)
+---
 
-Add this one line to `/config/configuration.yaml`:
+## Step 5 — Add Your First Points
 
-```yaml
-hass_console: !include console.yaml
-```
+On the HASS Console integration card, click **ADD**.
 
-Restart HA again.
+### Add a LOG point
 
-> **Note:** In YAML mode, the CSV paths are fixed at the defaults. Use UI mode if you want custom paths.
+Pick **Add LOG point** and fill in:
+
+| Field | Example |
+|-------|---------|
+| Point name | `DAILY_KWH` |
+| Cron schedule | `0 0 * * *` (daily at midnight) |
+| Entity to snapshot | `sensor.energy_meter_kwh` |
+| Category | `E-METER` |
+| Note | `Daily kWh snapshot at midnight` |
+
+Click **Submit**. You now have `hass_console.log_daily_kwh` — an entity that captures the meter reading every midnight and writes a row to `logs.csv`.
+
+### Add an ALARM point
+
+Click **ADD** again and pick **Add ALARM point**.
+
+1. On the header form:
+   - Point name: `TEMPERATURE_ALARM`
+   - Severity: `01 — Critical`
+   - Primary entity: `sensor.network_closet_temperature`
+   - Note: `Network closet overheat`
+2. On the **Triggers** step, pick **Add trigger** and fill in:
+   - Trigger type: **Numeric threshold**
+   - Entity to monitor: `sensor.network_closet_temperature`
+   - Above: `78`
+   - For — minutes: `10`
+   - Alias: `Above 78°F for 10 min`
+3. Back on the Triggers step, pick **Save alarm point**.
+
+You now have `hass_console.alarm_temperature_alarm` — an entity that flips to `ALARM` and writes a row to `alarms.csv` when the closet stays above 78°F for 10 minutes.
 
 ---
 
@@ -143,47 +134,21 @@ Switch to the Log tab on your card, click **↻ Refresh**, and you should see th
 
 ## Editing Your Configuration
 
-### Adding more points
+### Adding, editing, or deleting points
 
-Open `/config/console.yaml` and add more entries. To pick up the changes without restarting HA:
+- **Add** — Settings → Devices & Services → HASS Console → **ADD**
+- **Edit** — click any point in the list → **Configure**
+- **Delete** — the **⋮** menu on a point
 
-- **UI Mode:** Settings → Devices & Services → HASS Console → **⋮ → Reload**
-- **YAML Mode:** Developer Tools → Services → call `hass_console.reload`
+The engine reloads automatically after each change. No HA restart or manual reload needed.
 
-### Changing file paths (UI Mode only)
+### Changing file paths
 
 Settings → Devices & Services → HASS Console → **Configure**. Changes apply immediately.
 
----
+### Legacy console.yaml
 
-## Quick Reference
-
-### LOG point template
-
-```yaml
-MY_LOG_NAME:
-  type: LOG
-  cron: "CRON_EXPRESSION"
-  entity: sensor.your_entity
-  note: "What this log tracks"
-```
-
-### ALARM point template
-
-```yaml
-MY_ALARM_NAME:
-  type: ALARM
-  class: "01"                          # 01=Critical  02=Major  03=Minor
-  entity: sensor.your_entity
-  note: "What this alarm means"
-  trigger:
-    - alias: "Human-readable description"
-      platform: numeric_state
-      entity_id: sensor.your_entity
-      above: 80                        # or use "below: 20" for low alarms
-      for:
-        minutes: 10
-```
+If you're upgrading from 2.x, existing `console.yaml` points keep working. A Repairs issue lists how many are still YAML-only — migrate them by adding each one through the UI, then remove them from `console.yaml`. UI points always take precedence when names collide.
 
 ### Common cron schedules
 

@@ -22,6 +22,7 @@ ALARM_COLUMNS = [
 LOG_COLUMNS = ["timestamp", "category", "entity", "value", "note"]
 
 ISSUE_INVALID_CONFIG = "invalid_config"
+ISSUE_YAML_DEPRECATED = "yaml_deprecated"
 
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -36,3 +37,13 @@ CONF_CLASS = "class"
 CONF_TRIGGER = "trigger"
 CONF_CATEGORY = "category"
 CONF_TARGET_CSV = "target_csv"
+CONF_NAME = "name"
+
+# Subentry types (registered on the main config entry).
+SUBENTRY_LOG = "log_point"
+SUBENTRY_ALARM = "alarm_point"
+
+# Point / trigger platform strings.
+PLATFORM_NUMERIC = "numeric_state"
+PLATFORM_STATE = "state"
+SUPPORTED_PLATFORMS = (PLATFORM_NUMERIC, PLATFORM_STATE)

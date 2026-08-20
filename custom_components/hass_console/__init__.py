@@ -33,6 +33,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
+    CONF_NAME,
     CONF_TYPE, CONF_CRON, CONF_ENTITY, CONF_NOTE, CONF_CLASS,
     CONF_TRIGGER, CONF_CATEGORY, CONF_TARGET_CSV,
     CONF_CONSOLE_YAML, CONF_ALARM_CSV, CONF_LOG_CSV,
@@ -40,15 +41,13 @@ from .const import (
     DEFAULT_CONSOLE_YAML, DEFAULT_ALARM_CSV, DEFAULT_LOG_CSV,
     DEFAULT_RETENTION_DAYS, DEFAULT_MAX_ROWS,
     ALARM_COLUMNS, LOG_COLUMNS, TIMESTAMP_FORMAT, TYPE_LOG, TYPE_ALARM,
-    ISSUE_INVALID_CONFIG,
+    ISSUE_INVALID_CONFIG, ISSUE_YAML_DEPRECATED,
+    SUBENTRY_LOG, SUBENTRY_ALARM,
+    PLATFORM_NUMERIC, PLATFORM_STATE, SUPPORTED_PLATFORMS,
 )
 from .entity import HassConsolePointEntity
 
 _LOGGER = logging.getLogger(__name__)
-
-PLATFORM_NUMERIC = "numeric_state"
-PLATFORM_STATE = "state"
-SUPPORTED_PLATFORMS = {PLATFORM_NUMERIC, PLATFORM_STATE}
 
 FRONTEND_URL_BASE = "/hass_console_frontend"
 FRONTEND_CARDS = ("hass-console-card.js", "hass-console-summary-card.js")
@@ -930,6 +929,32 @@ async def async_setup(hass, config):
     return True
 
 
+def _points_from_subentries(entry: ConfigEntry) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for sub in entry.subentries.values():
+        if sub.subentry_type not in (SUBENTRY_LOG, SUBENTRY_ALARM):
+            continue
+        data = dict(sub.data)
+        name = data.pop(CONF_NAME, None)
+        if not name:
+            continue
+        out[name] = data
+    return out
+
+
+def _report_yaml_deprecated(hass, count: int) -> None:
+    if count <= 0:
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_YAML_DEPRECATED)
+        return
+    ir.async_create_issue(
+        hass, DOMAIN, ISSUE_YAML_DEPRECATED,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=ISSUE_YAML_DEPRECATED,
+        translation_placeholders={"count": str(count)},
+    )
+
+
 async def async_setup_entry(hass, entry):
     settings = {**entry.data, **entry.options}
     yaml_path = settings.get(CONF_CONSOLE_YAML, DEFAULT_CONSOLE_YAML)
@@ -937,10 +962,29 @@ async def async_setup_entry(hass, entry):
     log_csv = settings.get(CONF_LOG_CSV, DEFAULT_LOG_CSV)
     retention_days = settings.get(CONF_RETENTION_DAYS, DEFAULT_RETENTION_DAYS)
     max_rows = settings.get(CONF_MAX_ROWS, DEFAULT_MAX_ROWS)
-    points = await hass.async_add_executor_job(_load_yaml_sync, yaml_path)
+
+    sub_points = _points_from_subentries(entry)
+    yaml_points: dict[str, dict] = {}
+    if yaml_path:
+        yaml_points = await hass.async_add_executor_job(_load_yaml_sync, yaml_path)
+
+    merged: dict[str, dict] = {}
+    merged.update(yaml_points)
+    merged.update(sub_points)
+
+    yaml_only_count = len(set(yaml_points) - set(sub_points))
+    if yaml_only_count:
+        _LOGGER.warning(
+            "HASS Console: console.yaml is deprecated. %d point(s) are still "
+            "defined only there — use the integration's ADD button in "
+            "Settings → Devices & Services to migrate to UI-managed points.",
+            yaml_only_count,
+        )
+    _report_yaml_deprecated(hass, yaml_only_count)
+
     component = _get_component(hass)
     engine = HassConsoleEngine(
-        hass, points, alarm_csv, log_csv, retention_days, max_rows, component
+        hass, merged, alarm_csv, log_csv, retention_days, max_rows, component
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = engine
     if hass.is_running:
@@ -952,11 +996,17 @@ async def async_setup_entry(hass, entry):
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
+
 async def async_unload_entry(hass, entry):
     d = hass.data.get(DOMAIN, {})
     engine = d.pop(entry.entry_id, None)
     if engine: await engine.async_teardown()
     return True
+
+
+async def async_migrate_entry(hass, entry) -> bool:  # noqa: ARG001
+    return True
+
 
 async def _async_update_listener(hass, entry):
     await hass.config_entries.async_reload(entry.entry_id)

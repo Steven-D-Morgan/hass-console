@@ -4,6 +4,35 @@ User-facing notes for each release, newest first. For the full change-by-change 
 
 ---
 
+## 3.0.0-rc1 — points from the UI, YAML deprecated
+
+**Release candidate.** Enable **Show beta versions** in HACS to receive it. Existing 2.6.x users will not auto-update to `3.0.0-rc1`.
+
+Every LOG and ALARM point is now a **config subentry** on the HASS Console integration entry, so you add, edit, and delete them from Settings → Devices & Services → HASS Console — the same UX as automations. Multi-trigger ALARM points are supported natively in the flow (iterative Add / Edit / Delete on the triggers step).
+
+### 🎉 What's new
+
+- **Add points from the UI.** Settings → Devices & Services → HASS Console → **ADD** → LOG point or ALARM point. Existing points get a **Configure** button for edits and a **⋮ → Delete** option.
+- **Multi-trigger ALARM support in the UI.** The ALARM flow's Triggers step lets you add any number of triggers, edit each one, and delete individually before saving.
+- **AND `conditions` are preserved on edit.** The trigger editor doesn't yet expose a conditions form, but any `conditions:` imported from `console.yaml` are round-tripped losslessly when you edit the trigger — the future conditions UI slots in on top without a data migration.
+- **YAML deprecation surfaced in Repairs.** A warning-severity Repairs issue lists how many points are still defined only in `console.yaml` and clears itself once you've re-created each one through the UI.
+
+### ⚠️ Breaking
+
+- **Minimum Home Assistant is now 2025.3** (required for `ConfigSubentryFlow`).
+- **`console.yaml` is deprecated.** It still works during the 3.x line but will be removed in a future major release. New points should be added through the UI.
+
+### 📝 Upgrading from 2.6.x
+
+1. Update the integration (HACS or manual copy) and restart HA.
+2. Confirm the CSV paths on the HASS Console setup form (unchanged).
+3. Check Repairs — it lists how many YAML-only points remain. Re-add each one through **ADD** on the integration card, then remove the YAML entry.
+4. UI points always take precedence over same-named YAML points during the transition, so migration can happen at your own pace with no duplicate rows.
+
+Existing CSV files and acknowledgment state are untouched.
+
+---
+
 ## 2.6.3 — Hassfest validation fixes
 
 Passes Home Assistant's Hassfest validation cleanly. **No change to how the cards or the alarm/log engine behave** — 2.6.3 only fixes CI-validation errors that 2.6.2 tripped:

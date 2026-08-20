@@ -23,7 +23,7 @@ jobs:
           MANIFEST=$(python3 -c "import json;print(json.load(open('custom_components/hass_console/manifest.json'))['version'])")
           CARD=$(sed -n 's/.*const VER="\([^"]*\)".*/\1/p' custom_components/hass_console/frontend/hass-console-card.js | head -1)
           SUMMARY=$(sed -n 's/.*const SVER *= *"\([^"]*\)".*/\1/p' custom_components/hass_console/frontend/hass-console-summary-card.js | head -1)
-          CHANGELOG=$(grep -m1 -oE '^## v[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | sed 's/^## v//')
+          CHANGELOG=$(grep -m1 -oE '^## v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.+-]*' CHANGELOG.md | sed 's/^## v//')
 
           # Strip an optional leading "v" so v2.6.1 and 2.6.1 compare equal (HACS does the same).
           norm() { printf '%s' "${1#v}"; }
