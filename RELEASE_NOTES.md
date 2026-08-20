@@ -4,11 +4,15 @@ User-facing notes for each release, newest first. For the full change-by-change 
 
 ---
 
-## 3.0.0-rc1 — points from the UI, YAML deprecated
+## 3.0.0-rc1 — Points from the UI, YAML deprecated
 
-**Release candidate.** Enable **Show beta versions** in HACS to receive it. Existing 2.6.x users will not auto-update to `3.0.0-rc1`.
+**Release title:** `3.0.0-rc1 — Points from the UI, YAML deprecated`
+**Tag:** `v3.0.0-rc1`
+**Mark as pre-release:** ✅ (hides it from HACS users without "Show beta versions" enabled)
 
-Every LOG and ALARM point is now a **config subentry** on the HASS Console integration entry, so you add, edit, and delete them from Settings → Devices & Services → HASS Console — the same UX as automations. Multi-trigger ALARM points are supported natively in the flow (iterative Add / Edit / Delete on the triggers step).
+> ⚠️ **Release candidate.** Enable **Show beta versions** in HACS to receive this update. Existing 2.6.x users will not auto-update to `3.0.0-rc1`.
+
+Every LOG and ALARM point is now a **config subentry** on the HASS Console integration entry, so you add, edit, and delete them from Settings → Devices & Services → HASS Console — the same UX as automations. Multi-trigger ALARM points are supported natively (iterative Add / Edit / Delete on the triggers step).
 
 ### 🎉 What's new
 
@@ -30,6 +34,19 @@ Every LOG and ALARM point is now a **config subentry** on the HASS Console integ
 4. UI points always take precedence over same-named YAML points during the transition, so migration can happen at your own pace with no duplicate rows.
 
 Existing CSV files and acknowledgment state are untouched.
+
+### 🧪 Testing an RC
+
+Please try adding a few LOG and ALARM points from the UI and file issues against anything that feels rough. Particular things worth exercising:
+
+- LOG points with cron schedules (the entity selector should list the right entity).
+- ALARM points with multiple triggers — add, edit, and delete triggers before saving.
+- ALARM points migrated from a `console.yaml` entry that used `conditions:` — edit a trigger, save, and confirm the alarm still fires with the conditions intact.
+- The Repairs issue about YAML deprecation clearing correctly after moving every point to the UI.
+
+### Full changelog
+
+See [CHANGELOG.md](CHANGELOG.md#v300-rc1--2026-08-20) for the file-by-file breakdown.
 
 ---
 
