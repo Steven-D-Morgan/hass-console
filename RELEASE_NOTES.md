@@ -4,6 +4,41 @@ User-facing notes for each release, newest first. For the full change-by-change 
 
 ---
 
+## 3.1.0 — AND conditions in the UI, one-click YAML migration
+
+**Release title:** `3.1.0 — AND conditions in the UI, one-click YAML migration`
+**Tag:** `v3.1.0`
+**Mark as pre-release:** ❌
+
+Everything `console.yaml` supports is now reachable from the WebGUI. 3.1.0 closes the two remaining gaps from the 3.0.0 rollout:
+
+- **AND conditions** on each ALARM trigger are now edited from the UI, with the same iterative Add / Edit / Delete pattern as the triggers list itself.
+- **YAML → UI import** in one click. The deprecation Repairs issue is now a **fixable** issue — click **Fix** and every YAML-only point becomes a UI subentry in a single step.
+
+### 🎉 What's new
+
+- **Manage AND conditions from the ALARM flow.** Each trigger on the Triggers step gets a **Manage AND conditions** row that opens a sub-list. Add numeric (`above` / `below`) or state-match conditions; every condition must be true when the trigger fires, matching the engine's existing AND semantics.
+- **One-click YAML import.** In Repairs, the "HASS Console: console.yaml is deprecated" issue now has a **Fix** button. It shows the list of YAML-only points, creates a UI subentry for each, and reloads the integration. `console.yaml` is left untouched — remove the migrated entries at your own pace.
+- **Trigger edit form updated.** Its description now points at the new Manage AND conditions row instead of the previous "wait for the upcoming conditions editor" note.
+
+### ⚠️ Breaking
+
+None. Existing subentries and `console.yaml` configs upgrade in place.
+
+### 📝 Upgrading from 3.0.0-rc1 (or 2.6.x)
+
+1. Update the integration (HACS or manual copy) and restart HA.
+2. Open Repairs — the deprecation issue now has a **Fix** button. Click it to migrate every remaining YAML point in one shot, or keep migrating manually via **ADD**.
+3. On any existing ALARM point, use **Configure → Triggers step → Manage AND conditions** to view or edit conditions that were previously YAML-only.
+
+Existing CSV files, entity IDs, and acknowledgment state are untouched.
+
+### Full changelog
+
+See [CHANGELOG.md](CHANGELOG.md#v310--2026-08-20) for the file-by-file breakdown.
+
+---
+
 ## 3.0.0-rc1 — Points from the UI, YAML deprecated
 
 **Release title:** `3.0.0-rc1 — Points from the UI, YAML deprecated`

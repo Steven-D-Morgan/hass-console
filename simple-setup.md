@@ -148,7 +148,11 @@ Settings → Devices & Services → HASS Console → **Configure**. Changes appl
 
 ### Legacy console.yaml
 
-If you're upgrading from 2.x, existing `console.yaml` points keep working. A Repairs issue lists how many are still YAML-only — migrate them by adding each one through the UI, then remove them from `console.yaml`. UI points always take precedence when names collide.
+If you're upgrading from 2.x, existing `console.yaml` points keep working. A Repairs issue lists how many are still YAML-only — since **3.1.0** you can click **Fix** on that issue to import every YAML point as a UI subentry in one shot. `console.yaml` is left untouched; remove the migrated entries there yourself when you're ready. UI points always take precedence when names collide.
+
+### AND conditions on ALARM triggers
+
+Since **3.1.0**, each trigger on an ALARM point has a **Manage AND conditions** row on the Triggers step. Add numeric (`above` / `below`) or state-match conditions the same way you add triggers — every one must be true when the trigger fires. Conditions imported from `console.yaml` are fully editable there too.
 
 ### Common cron schedules
 

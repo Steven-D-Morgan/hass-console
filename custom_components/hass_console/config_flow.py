@@ -324,11 +324,30 @@ _TRIGGER_PLATFORM_SELECTOR = selector.SelectSelector(
     )
 )
 
+_CONDITION_TYPE_NUMERIC = "numeric"
+_CONDITION_TYPE_STATE = "state"
+_CONDITION_TYPE_OPTIONS = [
+    selector.SelectOptionDict(
+        value=_CONDITION_TYPE_NUMERIC, label="Numeric threshold (above/below)"
+    ),
+    selector.SelectOptionDict(
+        value=_CONDITION_TYPE_STATE, label="State match"
+    ),
+]
+_CONDITION_TYPE_SELECTOR = selector.SelectSelector(
+    selector.SelectSelectorConfig(
+        options=_CONDITION_TYPE_OPTIONS,
+        mode=selector.SelectSelectorMode.DROPDOWN,
+    )
+)
+
 
 class AlarmPointSubentryFlow(ConfigSubentryFlow):
     _data: dict[str, Any]
     _reconfigure: bool
     _editing_trigger_index: int | None
+    _editing_conditions_trigger_index: int | None
+    _editing_condition_index: int | None
 
     async def async_step_user(self, user_input=None) -> SubentryFlowResult:
         if not hasattr(self, "_data"):
@@ -338,6 +357,8 @@ class AlarmPointSubentryFlow(ConfigSubentryFlow):
                 CONF_TRIGGER: [],
             }
             self._editing_trigger_index = None
+            self._editing_conditions_trigger_index = None
+            self._editing_condition_index = None
         return await self._show_header(user_input)
 
     async def async_step_reconfigure(self, user_input=None) -> SubentryFlowResult:
@@ -345,9 +366,15 @@ class AlarmPointSubentryFlow(ConfigSubentryFlow):
             self._reconfigure = True
             sub = self._get_reconfigure_subentry()
             stored = dict(sub.data)
-            stored[CONF_TRIGGER] = [dict(t) for t in stored.get(CONF_TRIGGER, [])]
+            stored[CONF_TRIGGER] = [
+                {**dict(t), "conditions": [dict(c) for c in (t.get("conditions") or [])]}
+                if (t.get("conditions") or []) else dict(t)
+                for t in stored.get(CONF_TRIGGER, [])
+            ]
             self._data = stored
             self._editing_trigger_index = None
+            self._editing_conditions_trigger_index = None
+            self._editing_condition_index = None
         return await self._show_header(user_input)
 
     async def _show_header(
@@ -414,6 +441,11 @@ class AlarmPointSubentryFlow(ConfigSubentryFlow):
         for idx, trig in enumerate(triggers):
             label = self._trigger_summary(trig, idx)
             options[f"edit_{idx}"] = f"Edit — {label}"
+            cond_count = len(trig.get("conditions") or [])
+            cond_suffix = f" ({cond_count})" if cond_count else ""
+            options[f"conditions_{idx}"] = (
+                f"Manage AND conditions{cond_suffix} — {label}"
+            )
             options[f"delete_{idx}"] = f"Delete — {label}"
         options["add"] = "Add trigger"
         if triggers:
@@ -438,6 +470,12 @@ class AlarmPointSubentryFlow(ConfigSubentryFlow):
             if choice and choice.startswith("edit_"):
                 self._editing_trigger_index = int(choice.split("_", 1)[1])
                 return await self.async_step_edit_trigger()
+            if choice and choice.startswith("conditions_"):
+                self._editing_conditions_trigger_index = int(
+                    choice.split("_", 1)[1]
+                )
+                self._editing_condition_index = None
+                return await self.async_step_conditions()
             if choice and choice.startswith("delete_"):
                 idx = int(choice.split("_", 1)[1])
                 if 0 <= idx < len(triggers):
@@ -629,6 +667,179 @@ class AlarmPointSubentryFlow(ConfigSubentryFlow):
             desc = " ".join(parts) if parts else "numeric"
             return f"#{idx + 1}: {entity} {desc}"
         return f"#{idx + 1}: {entity} state={trig.get('to')}"
+
+    async def async_step_conditions(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        triggers = self._data.get(CONF_TRIGGER, [])
+        tidx = self._editing_conditions_trigger_index
+        if tidx is None or not (0 <= tidx < len(triggers)):
+            return await self.async_step_triggers()
+        trig = triggers[tidx]
+        conditions = trig.setdefault("conditions", [])
+
+        options: dict[str, str] = {}
+        for cidx, cond in enumerate(conditions):
+            label = self._condition_summary(cond, cidx)
+            options[f"edit_{cidx}"] = f"Edit — {label}"
+            options[f"delete_{cidx}"] = f"Delete — {label}"
+        options["add"] = "Add condition"
+        options["done"] = "Back to triggers"
+
+        if user_input is not None:
+            choice = user_input.get("next_step")
+            if choice == "add":
+                self._editing_condition_index = None
+                return await self.async_step_add_condition()
+            if choice == "done":
+                if not conditions:
+                    trig.pop("conditions", None)
+                self._editing_conditions_trigger_index = None
+                self._editing_condition_index = None
+                return await self.async_step_triggers()
+            if choice and choice.startswith("edit_"):
+                self._editing_condition_index = int(choice.split("_", 1)[1])
+                return await self.async_step_edit_condition()
+            if choice and choice.startswith("delete_"):
+                cidx = int(choice.split("_", 1)[1])
+                if 0 <= cidx < len(conditions):
+                    del conditions[cidx]
+                return await self.async_step_conditions()
+
+        return self.async_show_form(
+            step_id="conditions",
+            data_schema=self._triggers_schema(options),
+            description_placeholders={
+                "trigger": self._trigger_summary(trig, tidx),
+            },
+        )
+
+    async def async_step_add_condition(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._condition_form(user_input, edit_index=None)
+
+    async def async_step_edit_condition(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._condition_form(
+            user_input, edit_index=self._editing_condition_index
+        )
+
+    async def _condition_form(
+        self,
+        user_input: dict[str, Any] | None,
+        *,
+        edit_index: int | None,
+    ) -> SubentryFlowResult:
+        triggers = self._data.get(CONF_TRIGGER, [])
+        tidx = self._editing_conditions_trigger_index
+        if tidx is None or not (0 <= tidx < len(triggers)):
+            return await self.async_step_triggers()
+        trig = triggers[tidx]
+        conditions = trig.setdefault("conditions", [])
+
+        errors: dict[str, str] = {}
+
+        if edit_index is not None and 0 <= edit_index < len(conditions):
+            existing = conditions[edit_index]
+            has_num = (
+                existing.get("above") is not None
+                or existing.get("below") is not None
+            )
+            seed = {
+                "condition_type": (
+                    _CONDITION_TYPE_NUMERIC if has_num else _CONDITION_TYPE_STATE
+                ),
+                "entity_id": existing.get("entity_id", ""),
+                "above": existing.get("above"),
+                "below": existing.get("below"),
+                "state": _list_to_csv(existing.get("state")),
+            }
+        else:
+            seed = {
+                "condition_type": _CONDITION_TYPE_NUMERIC,
+                "entity_id": "",
+                "above": None,
+                "below": None,
+                "state": "",
+            }
+
+        if user_input is not None:
+            ctype = user_input.get("condition_type", _CONDITION_TYPE_NUMERIC)
+            entity_id = (user_input.get("entity_id") or "").strip()
+            above = user_input.get("above")
+            below = user_input.get("below")
+            state_raw = (user_input.get("state") or "").strip()
+
+            if not entity_id:
+                errors["entity_id"] = "entity_required"
+
+            if ctype == _CONDITION_TYPE_NUMERIC:
+                if above in (None, "") and below in (None, ""):
+                    errors["base"] = "numeric_needs_threshold"
+            elif ctype == _CONDITION_TYPE_STATE:
+                if not state_raw:
+                    errors["state"] = "state_needs_value"
+
+            if not errors:
+                cond: dict[str, Any] = {"entity_id": entity_id}
+                if ctype == _CONDITION_TYPE_NUMERIC:
+                    if above not in (None, ""):
+                        cond["above"] = float(above)
+                    if below not in (None, ""):
+                        cond["below"] = float(below)
+                else:
+                    cond["state"] = _csv_to_list_or_scalar(state_raw)
+
+                if edit_index is not None and 0 <= edit_index < len(conditions):
+                    conditions[edit_index] = cond
+                else:
+                    conditions.append(cond)
+                return await self.async_step_conditions()
+
+            seed = {**seed, **user_input}
+
+        schema = vol.Schema({
+            vol.Required(
+                "condition_type",
+                default=seed.get("condition_type", _CONDITION_TYPE_NUMERIC),
+            ): _CONDITION_TYPE_SELECTOR,
+            vol.Required(
+                "entity_id", default=seed.get("entity_id", "")
+            ): selector.EntitySelector(),
+            vol.Optional(
+                "above", default=_num_default(seed.get("above"))
+            ): vol.Any(vol.Coerce(float), None, ""),
+            vol.Optional(
+                "below", default=_num_default(seed.get("below"))
+            ): vol.Any(vol.Coerce(float), None, ""),
+            vol.Optional("state", default=seed.get("state", "")): str,
+        })
+
+        step_id = "edit_condition" if edit_index is not None else "add_condition"
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "trigger": self._trigger_summary(trig, tidx),
+            },
+        )
+
+    @staticmethod
+    def _condition_summary(cond: dict[str, Any], idx: int) -> str:
+        entity = cond.get("entity_id", "?")
+        if cond.get("above") is not None or cond.get("below") is not None:
+            parts = []
+            if cond.get("above") is not None:
+                parts.append(f">{cond['above']}")
+            if cond.get("below") is not None:
+                parts.append(f"<{cond['below']}")
+            return f"#{idx + 1}: {entity} {' '.join(parts)}"
+        if cond.get("state") is not None:
+            return f"#{idx + 1}: {entity} = {cond['state']}"
+        return f"#{idx + 1}: {entity} (advanced)"
 
 
 def _num_default(v: Any) -> Any:

@@ -1,5 +1,5 @@
 /**
- * HASS Console Summary Card v3.0.0-rc1
+ * HASS Console Summary Card v3.1.0
  *
  * Minimalist alarm severity gauges. Three numbers. That's it.
  *
@@ -9,7 +9,7 @@
  *   theme: auto
  *   refresh_interval: 30
  */
-const SVER = "3.0.0-rc1";
+const SVER = "3.1.0";
 
 class HassConsoleSummaryCard extends HTMLElement {
   constructor() {

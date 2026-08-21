@@ -942,16 +942,17 @@ def _points_from_subentries(entry: ConfigEntry) -> dict[str, dict]:
     return out
 
 
-def _report_yaml_deprecated(hass, count: int) -> None:
+def _report_yaml_deprecated(hass, count: int, entry_id: str) -> None:
     if count <= 0:
         ir.async_delete_issue(hass, DOMAIN, ISSUE_YAML_DEPRECATED)
         return
     ir.async_create_issue(
         hass, DOMAIN, ISSUE_YAML_DEPRECATED,
-        is_fixable=False,
+        is_fixable=True,
         severity=ir.IssueSeverity.WARNING,
         translation_key=ISSUE_YAML_DEPRECATED,
         translation_placeholders={"count": str(count)},
+        data={"entry_id": entry_id},
     )
 
 
@@ -980,7 +981,7 @@ async def async_setup_entry(hass, entry):
             "Settings → Devices & Services to migrate to UI-managed points.",
             yaml_only_count,
         )
-    _report_yaml_deprecated(hass, yaml_only_count)
+    _report_yaml_deprecated(hass, yaml_only_count, entry.entry_id)
 
     component = _get_component(hass)
     engine = HassConsoleEngine(

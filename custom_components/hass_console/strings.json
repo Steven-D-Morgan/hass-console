@@ -139,7 +139,7 @@
         },
         "edit_trigger": {
           "title": "Edit trigger",
-          "description": "Update this trigger's settings. Any AND conditions already stored on this trigger are preserved (edit them in console.yaml or wait for the upcoming conditions editor).",
+          "description": "Update this trigger's settings. AND conditions are managed separately from the triggers list — pick **Manage AND conditions** for this trigger to add or edit them.",
           "data": {
             "platform": "Trigger type",
             "alias": "Alias",
@@ -152,6 +152,35 @@
             "for_minutes": "For — minutes",
             "for_seconds": "For — seconds"
           }
+        },
+        "conditions": {
+          "title": "AND conditions — {trigger}",
+          "description": "Every condition here must be true at the moment the trigger fires (AND). Leave empty for a trigger that fires purely on its primary condition.",
+          "data": {
+            "next_step": "Next"
+          }
+        },
+        "add_condition": {
+          "title": "Add AND condition — {trigger}",
+          "description": "The condition is evaluated against the current state of the entity you pick. A numeric condition needs at least one of 'above' or 'below'; a state condition needs at least one matching state (comma-separated for multi-match).",
+          "data": {
+            "condition_type": "Condition type",
+            "entity_id": "Entity to check",
+            "above": "Above (numeric — leave blank if using below)",
+            "below": "Below (numeric — leave blank if using above)",
+            "state": "State matches (state — comma-separated for multi-match)"
+          }
+        },
+        "edit_condition": {
+          "title": "Edit AND condition — {trigger}",
+          "description": "Change what this condition checks. Switching between Numeric and State clears the fields that no longer apply.",
+          "data": {
+            "condition_type": "Condition type",
+            "entity_id": "Entity to check",
+            "above": "Above",
+            "below": "Below",
+            "state": "State matches"
+          }
         }
       },
       "error": {
@@ -160,6 +189,7 @@
         "entity_required": "Entity is required",
         "numeric_needs_threshold": "Numeric triggers need an 'above' or 'below' value",
         "state_needs_to": "State triggers need at least one 'to' value",
+        "state_needs_value": "State conditions need at least one matching state",
         "at_least_one_trigger": "An ALARM point needs at least one trigger before it can be saved"
       }
     }
@@ -171,7 +201,19 @@
     },
     "yaml_deprecated": {
       "title": "HASS Console: console.yaml is deprecated",
-      "description": "{count} point(s) are still defined only in console.yaml. YAML setup is deprecated as of 3.0.0 and will be removed in a future release.\n\nMigrate to UI-managed points: Settings → Devices & Services → HASS Console → ADD → LOG point or ALARM point.\n\nUI-managed points appear alongside YAML points on the integration card; once every point is added through the UI, remove them from console.yaml (or delete the file) and this warning clears."
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Import YAML points to the UI",
+            "description": "{count} point(s) are still defined only in console.yaml. Click **Submit** to create a UI subentry for each one — the console.yaml file itself is left alone (delete the imported entries yourself when you're ready).\n\n**Points that will be imported:**\n\n{names}"
+          }
+        },
+        "abort": {
+          "no_points": "No YAML-only points remain — nothing to import.",
+          "reload_failed": "Points were imported but the integration could not be reloaded automatically. Restart Home Assistant or reload HASS Console from its integration menu to activate them."
+        }
+      },
+      "description": "{count} point(s) are still defined only in console.yaml. YAML setup is deprecated as of 3.0.0 and will be removed in a future release.\n\nClick **Fix** to import every YAML-only point as a UI subentry in one shot. You can also migrate manually with Settings → Devices & Services → HASS Console → ADD → LOG point or ALARM point.\n\nUI-managed points appear alongside YAML points on the integration card; once every point is UI-managed, remove them from console.yaml (or delete the file) and this warning clears."
     }
   }
 }

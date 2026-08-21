@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.1.0](#v310--2026-08-20) | 2026-08-20 | AND-conditions editor in the UI; one-click YAML import via Repairs |
 | [v3.0.0-rc1](#v300-rc1--2026-08-20) | 2026-08-20 | Points managed as UI subentries; YAML deprecated; HA 2025.3+ |
 | [v2.6.3](#v263--2026-08-11) | 2026-08-11 | Hassfest validation fixes (http dependency, CONFIG_SCHEMA) |
 | [v2.6.2](#v262--2026-08-11) | 2026-08-11 | Fix card auto-registration (register as a Lovelace resource) |
@@ -23,6 +24,42 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v3.1.0 — 2026-08-20
+
+### 🎉 Richer point management from the UI
+
+Everything `console.yaml` supports is now reachable from the WebGUI. Two additions:
+
+1. **AND conditions on each trigger** are now edited from the UI, with the same iterative Add / Edit / Delete flow as the triggers list itself.
+2. **YAML → UI import** in one click. The `console.yaml` deprecation Repairs issue is now **fixable** — click **Fix** and every YAML-only point becomes a UI subentry.
+
+### ➕ Added
+
+- **AND-conditions editor.** On the Triggers step of an ALARM point, each trigger now shows a **Manage AND conditions** row. Add, edit, and delete conditions the same way triggers work; both numeric (`above` / `below`) and state-match conditions are supported, matching what the engine already evaluates.
+- **YAML import via Repairs.** The `yaml_deprecated` issue is fixable in 3.1.0 — clicking **Fix** shows the list of YAML-only points, creates one subentry per point, and reloads the integration so they're active immediately. `console.yaml` is left untouched; delete the migrated entries at your own pace.
+
+### ⚙️ Changed
+
+- **`yaml_deprecated` Repairs issue** — now `is_fixable=True` with `data={"entry_id": ...}`, driving the new `ImportYamlPointsFlow` in `repairs.py`. Existing text updated to advertise the Fix button.
+- **Trigger edit step description** — replaces the "wait for the upcoming conditions editor" note with a pointer to the new Manage AND conditions row.
+
+### 📝 Notes
+
+Existing subentries and `console.yaml` configs upgrade in place — no data migration is required. Conditions imported from YAML in 3.0.0-rc1 (round-tripped but not editable) become fully editable in 3.1.0 without touching the on-disk shape.
+
+### Changed files
+
+- `custom_components/hass_console/config_flow.py` — condition list/form steps on `AlarmPointSubentryFlow`; deep-copy conditions on reconfigure so bail-outs don't mutate the subentry.
+- `custom_components/hass_console/repairs.py` — **new file.** `async_create_fix_flow` + `ImportYamlPointsFlow`.
+- `custom_components/hass_console/__init__.py` — `_report_yaml_deprecated` sets `is_fixable=True` and passes `entry_id` via `data`.
+- `custom_components/hass_console/strings.json` + `translations/en.json` — new `conditions` / `add_condition` / `edit_condition` steps; new `state_needs_value` error; new `fix_flow` block on `yaml_deprecated`.
+- `custom_components/hass_console/manifest.json` — version `3.1.0`.
+- `custom_components/hass_console/frontend/hass-console-card.js` — `VER` bumped.
+- `custom_components/hass_console/frontend/hass-console-summary-card.js` — `SVER` bumped.
+- `CHANGELOG.md`, `RELEASE_NOTES.md`, `ROAD_MAP.md`, `simple-setup.md` — documentation updated for the conditions editor and one-click YAML import.
 
 ---
 

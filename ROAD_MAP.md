@@ -12,6 +12,7 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## ✅ Recently Shipped (for context)
 
+- **v3.1.0** — **AND `conditions` are now edited from the UI**, with the same iterative Add / Edit / Delete flow as the triggers list. The `console.yaml` deprecation Repairs issue is now **fixable** — one click imports every YAML-only point as a UI subentry (leaves `console.yaml` untouched so you can delete migrated entries at your own pace). No engine changes; no data migration.
 - **v3.0.0-rc1** — points (LOG and ALARM) are now managed as **config subentries** on the integration — add/edit/delete from Settings → Devices & Services → HASS Console, same UX as automations. Multi-trigger ALARM flow (iterative add/edit/delete). `console.yaml` deprecated with a Repairs issue steering users to the UI. Minimum HA bumped to 2025.3 (needed for `ConfigSubentryFlow`). Standardized on `X.Y.Z-rcN` pre-release tags.
 - **v2.6.3** — Hassfest validation fixes (`http` dependency, permissive `CONFIG_SCHEMA`).
 - **v2.6.2** — fix card auto-registration: register the cards as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see).
@@ -24,9 +25,9 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ## 🎯 Next Up
 
-- [ ] **UI editor for AND `conditions`** `high · med` — 3.0.0-rc1 lets users add/edit/delete triggers from the UI, but AND `conditions` on a trigger are still YAML-only. Data model already reserves the slot and the flow preserves conditions across trigger edits, so this is UI work only: a nested "add condition" sub-step on the trigger form. Reuses the same iterative pattern as the trigger list.
-- [ ] **One-click YAML → subentries import** `high · med` — the 3.0.0-rc1 Repairs issue asks users to re-enter YAML points through the UI. A fixable Repairs flow (or a service like `hass_console.import_yaml_points`) that creates one subentry per YAML point would remove the manual step. Non-trivial because the "import wizard" needs to preview and dedupe against existing subentries.
-- [ ] **Remove `console.yaml` support** `med · large` — once import and the conditions editor land, YAML setup can be dropped in a future major (probably `4.0`). The engine's point-map input shape stays the same; the removal is deleting `_load_yaml_sync`, the CONFIG_SCHEMA branch of `async_setup`, and the YAML path field from the config/options forms.
+- [x] **UI editor for AND `conditions`** `high · med` — **✅ Shipped in 3.1.0.** Iterative Add/Edit/Delete under each trigger; numeric and state-match conditions. No engine change (the engine already evaluated them).
+- [x] **One-click YAML → subentries import** `high · med` — **✅ Shipped in 3.1.0.** The `yaml_deprecated` Repairs issue is now fixable; one click creates a subentry per YAML-only point and reloads. `console.yaml` is left untouched.
+- [ ] **Remove `console.yaml` support** `med · large` — with import + conditions editor in place, YAML setup can be dropped in a future major (probably `4.0`). The engine's point-map input shape stays the same; the removal is deleting `_load_yaml_sync`, the CONFIG_SCHEMA branch of `async_setup`, and the YAML path field from the config/options forms.
 - [x] **Auto-register the Lovelace cards from the integration** `high · med` — **✅ Shipped in 2.6.1, fixed in 2.6.2.**
 - [x] **Single-source the version + cut a clean stable 2.6.0** `high · small` — **✅ Shipped.**
 - [x] **Release-time version guard** `med · small` — **✅ Shipped** as `.github/workflows/version-guard.yaml`. Updated in 3.0.0-rc1 to accept PEP440/semver pre-release suffixes on CHANGELOG headings.
