@@ -32,7 +32,7 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 - [x] **Single-source the version + cut a clean stable 2.6.0** `high · small` — **✅ Shipped.**
 - [x] **Release-time version guard** `med · small` — **✅ Shipped** as `.github/workflows/version-guard.yaml`. Updated in 3.0.0-rc1 to accept PEP440/semver pre-release suffixes on CHANGELOG headings.
 - [x] **Consistent tag scheme** `low · small` — **✅ Standardized in 3.0.0-rc1** on `vX.Y.Z` for releases and `vX.Y.Z-rcN` / `vX.Y.Z-bN` for pre-releases.
-- [ ] **`.gitignore` + drop committed bytecode** `med · small` — `custom_components/hass_console/__pycache__/*.pyc` (py3.14) is tracked and would otherwise ship to every user. Add a `.gitignore` and `git rm` the tracked `.pyc`.
+- [x] **`.gitignore` + drop committed bytecode** `med · small` — **✅ Done.** `.gitignore` covers `__pycache__/` and `*.py[cod]`; no `.pyc` files are tracked.
 
 ---
 
