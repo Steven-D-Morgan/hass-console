@@ -159,10 +159,9 @@ Two steps.
    - **Entity to monitor.**
    - **Alias** (optional, shown in the Trigger column of the alarm card).
    - **For** duration (hours / minutes / seconds) — how long the condition must hold before recording.
+   - **Manage AND conditions** — since 3.1.0, each trigger has a nested list where you add, edit, or delete extra conditions that must also be true when the trigger fires. Numeric (`above` / `below`) and state-match conditions are supported.
 
-Multiple triggers on one ALARM point behave as OR — any trigger firing records the alarm.
-
-> **AND conditions** (a trigger that only fires when a *second* entity is also in a certain state) are stored on the trigger data model but not yet editable from the UI in 3.0.0-rc1. Triggers imported from `console.yaml` with `conditions:` keep them intact — the UI preserves conditions on edit. A conditions editor is on the roadmap.
+Multiple triggers on one ALARM point behave as OR — any trigger firing records the alarm. Within a single trigger, its primary condition AND every entry in its AND-conditions list must all be true.
 
 ### Reload
 
