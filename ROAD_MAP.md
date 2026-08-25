@@ -13,7 +13,7 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 ## ✅ Recently Shipped (for context)
 
 - **v3.1.0** — **AND `conditions` are now edited from the UI**, with the same iterative Add / Edit / Delete flow as the triggers list. The `console.yaml` deprecation Repairs issue is now **fixable** — one click imports every YAML-only point as a UI subentry (leaves `console.yaml` untouched so you can delete migrated entries at your own pace). No engine changes; no data migration.
-- **v3.0.0-rc1** — points (LOG and ALARM) are now managed as **config subentries** on the integration — add/edit/delete from Settings → Devices & Services → HASS Console, same UX as automations. Multi-trigger ALARM flow (iterative add/edit/delete). `console.yaml` deprecated with a Repairs issue steering users to the UI. Minimum HA bumped to 2025.3 (needed for `ConfigSubentryFlow`). Standardized on `X.Y.Z-rcN` pre-release tags.
+- **v3.0.0** (2026-08-21, promoted from `v3.0.0-rc1` unchanged) — points (LOG and ALARM) are now managed as **config subentries** on the integration — add/edit/delete from Settings → Devices & Services → HASS Console, same UX as automations. Multi-trigger ALARM flow (iterative add/edit/delete). `console.yaml` deprecated with a Repairs issue steering users to the UI. Minimum HA bumped to 2025.3 (needed for `ConfigSubentryFlow`). Standardized on `X.Y.Z-rcN` pre-release tags.
 - **v2.6.3** — Hassfest validation fixes (`http` dependency, permissive `CONFIG_SCHEMA`).
 - **v2.6.2** — fix card auto-registration: register the cards as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see).
 - **v2.6.1** — bundle the cards inside the integration and serve them; minimum HA bumped to 2024.7. (Auto-registration didn't work reliably until 2.6.2.)
@@ -68,4 +68,4 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ---
 
-_Last updated: 2026-08-20. Ratings are guidance, not gospel — revisit as the project changes._
+_Last updated: 2026-08-25. Ratings are guidance, not gospel — revisit as the project changes._

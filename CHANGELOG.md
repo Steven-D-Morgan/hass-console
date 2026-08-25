@@ -6,7 +6,8 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
-| [v3.1.0](#v310--2026-08-20) | 2026-08-20 | AND-conditions editor in the UI; one-click YAML import via Repairs |
+| [v3.1.0](#v310--2026-08-25) | 2026-08-25 | AND-conditions editor in the UI; one-click YAML import via Repairs |
+| [v3.0.0](#v300--2026-08-21) | 2026-08-21 | Promotion of `v3.0.0-rc1` to stable — no code changes |
 | [v3.0.0-rc1](#v300-rc1--2026-08-20) | 2026-08-20 | Points managed as UI subentries; YAML deprecated; HA 2025.3+ |
 | [v2.6.3](#v263--2026-08-11) | 2026-08-11 | Hassfest validation fixes (http dependency, CONFIG_SCHEMA) |
 | [v2.6.2](#v262--2026-08-11) | 2026-08-11 | Fix card auto-registration (register as a Lovelace resource) |
@@ -27,7 +28,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 ---
 
-## v3.1.0 — 2026-08-20
+## v3.1.0 — 2026-08-25
 
 ### 🎉 Richer point management from the UI
 
@@ -60,6 +61,12 @@ Existing subentries and `console.yaml` configs upgrade in place — no data migr
 - `custom_components/hass_console/frontend/hass-console-card.js` — `VER` bumped.
 - `custom_components/hass_console/frontend/hass-console-summary-card.js` — `SVER` bumped.
 - `CHANGELOG.md`, `RELEASE_NOTES.md`, `ROAD_MAP.md`, `simple-setup.md` — documentation updated for the conditions editor and one-click YAML import.
+
+---
+
+## v3.0.0 — 2026-08-21
+
+Promotion of [`v3.0.0-rc1`](#v300-rc1--2026-08-20) to stable. **No code changes** between `v3.0.0-rc1` and `v3.0.0` — the RC feedback window closed with no new fixes required, so the identical build was re-tagged as the stable `3.0.0` release. See the [`v3.0.0-rc1`](#v300-rc1--2026-08-20) entry below for the full breakdown of what landed in the 3.0.0 line.
 
 ---
 

@@ -35,7 +35,17 @@ Existing CSV files, entity IDs, and acknowledgment state are untouched.
 
 ### Full changelog
 
-See [CHANGELOG.md](CHANGELOG.md#v310--2026-08-20) for the file-by-file breakdown.
+See [CHANGELOG.md](CHANGELOG.md#v310--2026-08-25) for the file-by-file breakdown.
+
+---
+
+## 3.0.0 — Points from the UI, YAML deprecated (stable)
+
+**Release title:** `3.0.0 — Points from the UI, YAML deprecated`
+**Tag:** `v3.0.0`
+**Mark as pre-release:** ❌
+
+Promotion of [`3.0.0-rc1`](#300-rc1--points-from-the-ui-yaml-deprecated) to stable — same build, retagged after the RC window closed with no follow-up fixes required. Everything that landed in the 3.0.0 line is described in the `3.0.0-rc1` notes below (UI subentries for LOG / ALARM points, multi-trigger ALARM flow, `console.yaml` deprecation, HA 2025.3+ minimum). See [CHANGELOG.md](CHANGELOG.md#v300--2026-08-21) for the release row.
 
 ---
 
