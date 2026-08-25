@@ -200,20 +200,19 @@
       "description": "Some points in your console.yaml were skipped or incomplete and won't work as expected:\n\n{problems}\n\nFix them in console.yaml, then reload HASS Console (integration menu → Reload, or the hass_console.reload service)."
     },
     "yaml_deprecated": {
-      "title": "HASS Console: console.yaml is deprecated",
+      "title": "HASS Console: console.yaml is deprecated ({count} point(s) not yet migrated)",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Import YAML points to the UI",
-            "description": "{count} point(s) are still defined only in console.yaml. Click **Submit** to create a UI subentry for each one — the console.yaml file itself is left alone (delete the imported entries yourself when you're ready).\n\n**Points that will be imported:**\n\n{names}"
+            "description": "{count} point(s) are still defined only in console.yaml. YAML setup is deprecated as of 3.0.0 and will be removed in a future release.\n\nClick **Submit** to create a UI subentry for each of the points below — the console.yaml file itself is left untouched (delete the imported entries yourself when you're ready). You can also cancel and migrate them manually via **Settings → Devices & Services → HASS Console → ADD**.\n\n**Points that will be imported:**\n\n{names}"
           }
         },
         "abort": {
           "no_points": "No YAML-only points remain — nothing to import.",
           "reload_failed": "Points were imported but the integration could not be reloaded automatically. Restart Home Assistant or reload HASS Console from its integration menu to activate them."
         }
-      },
-      "description": "{count} point(s) are still defined only in console.yaml. YAML setup is deprecated as of 3.0.0 and will be removed in a future release.\n\nClick **Fix** to import every YAML-only point as a UI subentry in one shot. You can also migrate manually with Settings → Devices & Services → HASS Console → ADD → LOG point or ALARM point.\n\nUI-managed points appear alongside YAML points on the integration card; once every point is UI-managed, remove them from console.yaml (or delete the file) and this warning clears."
+      }
     }
   }
 }

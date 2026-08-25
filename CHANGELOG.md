@@ -44,7 +44,7 @@ Everything `console.yaml` supports is now reachable from the WebGUI. Two additio
 
 ### ⚙️ Changed
 
-- **`yaml_deprecated` Repairs issue** — now `is_fixable=True` with `data={"entry_id": ...}`, driving the new `ImportYamlPointsFlow` in `repairs.py`. Existing text updated to advertise the Fix button.
+- **`yaml_deprecated` Repairs issue** — now `is_fixable=True` with `data={"entry_id": ...}`, driving the new `ImportYamlPointsFlow` in `repairs.py`. The Repairs card advertises the Fix button and embeds the outstanding-point count in the title (the top-level `description` is gone — Home Assistant's translation schema declares it mutually exclusive with `fix_flow` under `vol.Exclusive('fixable')`, so the informative copy lives under `fix_flow.step.confirm.description`).
 - **Trigger edit step description** — replaces the "wait for the upcoming conditions editor" note with a pointer to the new Manage AND conditions row.
 
 ### 📝 Notes
@@ -56,7 +56,7 @@ Existing subentries and `console.yaml` configs upgrade in place — no data migr
 - `custom_components/hass_console/config_flow.py` — condition list/form steps on `AlarmPointSubentryFlow`; deep-copy conditions on reconfigure so bail-outs don't mutate the subentry.
 - `custom_components/hass_console/repairs.py` — **new file.** `async_create_fix_flow` + `ImportYamlPointsFlow`.
 - `custom_components/hass_console/__init__.py` — `_report_yaml_deprecated` sets `is_fixable=True` and passes `entry_id` via `data`.
-- `custom_components/hass_console/strings.json` + `translations/en.json` — new `conditions` / `add_condition` / `edit_condition` steps; new `state_needs_value` error; new `fix_flow` block on `yaml_deprecated`.
+- `custom_components/hass_console/strings.json` + `translations/en.json` — new `conditions` / `add_condition` / `edit_condition` steps; new `state_needs_value` error; new `fix_flow` block on `yaml_deprecated` (no top-level `description`, so Hassfest's `vol.Exclusive('fixable')` rule is satisfied).
 - `custom_components/hass_console/manifest.json` — version `3.1.0`.
 - `custom_components/hass_console/frontend/hass-console-card.js` — `VER` bumped.
 - `custom_components/hass_console/frontend/hass-console-summary-card.js` — `SVER` bumped.

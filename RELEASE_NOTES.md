@@ -25,7 +25,7 @@ Everything `console.yaml` supports is now reachable from the WebGUI. 3.1.0 close
 
 None. Existing subentries and `console.yaml` configs upgrade in place.
 
-### 📝 Upgrading from 3.0.0-rc1 (or 2.6.x)
+### 📝 Upgrading from 3.0.0 (or 2.6.x)
 
 1. Update the integration (HACS or manual copy) and restart HA.
 2. Open Repairs — the deprecation issue now has a **Fix** button. Click it to migrate every remaining YAML point in one shot, or keep migrating manually via **ADD**.
