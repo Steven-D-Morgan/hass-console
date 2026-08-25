@@ -10,18 +10,6 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ---
 
-## ✅ Recently Shipped (for context)
-
-- **v3.1.0** — **AND `conditions` are now edited from the UI**, with the same iterative Add / Edit / Delete flow as the triggers list. The `console.yaml` deprecation Repairs issue is now **fixable** — one click imports every YAML-only point as a UI subentry (leaves `console.yaml` untouched so you can delete migrated entries at your own pace). No engine changes; no data migration.
-- **v3.0.0** (2026-08-21, promoted from `v3.0.0-rc1` unchanged) — points (LOG and ALARM) are now managed as **config subentries** on the integration — add/edit/delete from Settings → Devices & Services → HASS Console, same UX as automations. Multi-trigger ALARM flow (iterative add/edit/delete). `console.yaml` deprecated with a Repairs issue steering users to the UI. Minimum HA bumped to 2025.3 (needed for `ConfigSubentryFlow`). Standardized on `X.Y.Z-rcN` pre-release tags.
-- **v2.6.3** — Hassfest validation fixes (`http` dependency, permissive `CONFIG_SCHEMA`).
-- **v2.6.2** — fix card auto-registration: register the cards as Lovelace resources (the 2.6.1 `extra_module_url` approach loaded too early for the dashboard to see).
-- **v2.6.1** — bundle the cards inside the integration and serve them; minimum HA bumped to 2024.7. (Auto-registration didn't work reliably until 2.6.2.)
-- **v2.6.0** — local-time cron + OR day-rule + name aliases, real restorable `hass_console.*` entities, opt-in retention/rotation (unacknowledged alarms never pruned), acknowledge notes, Config Repairs for invalid `console.yaml`.
-- **v2.5.2** — state-trigger duration fix for entities already in the alarm state; `show_alarm`/`show_log` card tabs.
-- **v2.5.0** — state triggers, multi-condition AND, theme support, summary card, integration icon, HACS support files.
-
----
 
 ## 🎯 Next Up
 
@@ -36,13 +24,6 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 
 ---
 
-## 📦 Distribution & Downloads
-
-- [x] **Total + latest download badges** `low · small` — _done._ shields.io `downloads/…/total` and `…/latest/total` in the README.
-- [x] **Release workflow attaches `hass_console.zip`** `low · small` — _done._ `.github/workflows/release.yml` runs on `release: published`, zips the integration, and uploads it as a release asset so the badges have a countable asset.
-- [ ] **`zip_release` migration (optional, deliberate)** `med · med` — switching `hacs.json` to `zip_release: true` + `filename: hass_console.zip` makes HACS install *from* the zip asset, so the download counters reflect **real installs** instead of just manual downloads. Breaking: every installable release must then carry the asset, and the zip's internal layout must match what HACS expects — verify against HACS docs and ship as its own deliberate release.
-
----
 
 ## ✨ Features
 
@@ -52,20 +33,3 @@ This backlog is seeded from the project's own notes (the CHANGELOG flags SQLite 
 - [ ] **Acknowledge from the summary card** `low · med` _(suggested)_ — surface ACK / ACK-All on the at-a-glance summary card, not just the full card.
 
 ---
-
-## 🧪 Testing & Quality
-
-- [ ] **Unit tests for the pure logic** `high · med` — add `pytest-homeassistant-custom-component` and cover the cron parser (ranges/steps/lists, name aliases, local-time matching, OR day-rule), condition/AND evaluation, retention pruning (unacked never pruned), and CSV schema migration. None of these need a running HA instance.
-- [ ] **Keep HACS + Hassfest green** `low · small` — the two existing validation workflows are the Python-native equivalent of a build gate; keep them passing on every PR.
-- [ ] **Ruff/Black lint + format gate** `med · small` _(suggested)_ — a single Python lint/format check on PRs.
-
----
-
-## 📚 Docs
-
-- [x] **Trim manual card-install steps** `med · small` — **✅ Shipped in 2.6.1.** README + simple-setup.md no longer tell users to copy the card to `www` or add a Resource; they document the auto-load flow and the upgrade cleanup.
-- [ ] **Example `console.yaml` library** `low · small` _(suggested)_ — a few small, focused annotated configs (just LOG points, just ALARMs, custom target CSVs) alongside the full reference.
-
----
-
-_Last updated: 2026-08-25. Ratings are guidance, not gospel — revisit as the project changes._
