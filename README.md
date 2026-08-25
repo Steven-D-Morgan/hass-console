@@ -20,6 +20,8 @@
 If you've used a Niagara AX/N4 alarm console, you know the value of a single pane of glass that shows every alarm and every logged data point across your facility. HASS Console brings that pattern to Home Assistant — threshold-based alarm evaluation with duration requirements, alarm acknowledgment, cron-scheduled data snapshots, severity classification, system categorization, and a sortable/filterable viewer — with points you add, edit, and delete from the Home Assistant UI.
 
 > **New in 3.0.0:** points (LOG and ALARM) live as **config subentries** on the integration, so you can add / edit / delete them from Settings → Devices & Services → HASS Console — the same UX as automations. `console.yaml` still works but is **deprecated** and will be removed in a future major release.
+>
+> **New in 3.1.0:** AND `conditions` on each ALARM trigger are edited from the UI (iterative Add / Edit / Delete on the Triggers step), and the `console.yaml` deprecation Repairs issue has a **Fix** button that imports every YAML-only point as a UI subentry in one click.
 
 ---
 
@@ -104,7 +106,7 @@ Re-copy `custom_components/hass_console/` over the old folder (or update through
 
 **Upgrading from 2.6.0 or earlier:** remove the two HASS Console entries from **Settings → Dashboards → Resources** — the integration now loads the cards for you. If you leave them, the old (pre-2.6.1) card file is unguarded, so it can log an "already defined" error in the browser console and may keep serving a stale cached copy; your dashboard keeps working either way. You can also delete the old `/config/www/hass-console-card.js` and `hass-console-summary-card.js` files.
 
-**Upgrading from 2.x:** existing `console.yaml` points keep working. A Repairs issue appears listing how many points are still YAML-only; migrate them by adding each one through the UI (Settings → Devices & Services → HASS Console → **ADD**) and then remove them from `console.yaml`. UI-added points always take precedence over a same-named YAML point during the transition. YAML support will be removed in a future major release.
+**Upgrading from 2.x:** existing `console.yaml` points keep working. A Repairs issue appears listing how many points are still YAML-only — since **3.1.0** it has a **Fix** button that creates a UI subentry for each YAML point in one click. `console.yaml` is left untouched; remove the migrated entries yourself when you're ready. UI-added points always take precedence over a same-named YAML point during the transition. YAML support will be removed in a future major release.
 
 ---
 
