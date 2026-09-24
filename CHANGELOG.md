@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.2.0](#v320--2026-09-24) | 2026-09-24 | Card `appearance: hass_ui` — native Home Assistant look for both cards |
 | [v3.1.0](#v310--2026-08-25) | 2026-08-25 | AND-conditions editor in the UI; one-click YAML import via Repairs |
 | [v3.0.0](#v300--2026-08-21) | 2026-08-21 | Promotion of `v3.0.0-rc1` to stable — no code changes |
 | [v3.0.0-rc1](#v300-rc1--2026-08-20) | 2026-08-20 | Points managed as UI subentries; YAML deprecated; HA 2025.3+ |
@@ -25,6 +26,36 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v3.2.0 — 2026-09-24
+
+### 🎨 Native Home Assistant look for both cards
+
+Both `hass-console-card` and `hass-console-summary-card` gain a new `appearance` option that lets them render in the same visual language as the rest of the HA dashboard. Existing cards keep the Niagara-inspired look unchanged — the new mode is opt-in.
+
+### ➕ Added
+
+- **`appearance: default | hass_ui`** on both cards (defaults to `default`, so nothing changes without opting in).
+  - `default` — the Niagara-inspired styling, exactly as `v3.1.0` rendered it.
+  - `hass_ui` — restyles colors, typography, and severity mapping to match Home Assistant's own cards:
+    - **Colors** flow from HA's CSS variables (`--ha-card-background`, `--primary-text-color`, `--secondary-text-color`, `--divider-color`, `--primary-color`) instead of the hard-coded Niagara palette.
+    - **Severity** remaps to HA state colors — `--error-color` → Critical, `--warning-color` → Major, `--info-color` → Minor, `--success-color` → cleared/ACK'd — so the same hues used by HA badges and alerts show up on chips, gauges, and severity classes.
+    - **Typography** switches to HA's Roboto/Noto sans-serif stack, with normal case and reduced letter-spacing on headers, tabs, and column labels (the monospace + uppercase treatment stays in `default`).
+    - **Summary card gauges** drop the pulsing glow in `hass_ui`, keeping just a state-colored number, border, and label — closer to how HA info surfaces present counts.
+- Independent of the existing `theme: auto | dark | light` option, which still controls dark/light mode following. The two combine — `appearance: hass_ui, theme: auto` gets HA-native styling that also tracks the user's dark/light preference.
+
+### 📝 Notes
+
+Existing configurations upgrade in place. No engine changes; no data migration. Nothing to reconfigure — anyone who wants the new look adds `appearance: hass_ui` to the card YAML (or picks it up in the visual card editor once that ships).
+
+### Changed files
+
+- `custom_components/hass_console/frontend/hass-console-card.js` — new `appearance` config key; palette helper + CSS-variable refactor so colors are single-sourced; `data-app="hass_ui"` structural overrides for the softer typography; `VER` bumped.
+- `custom_components/hass_console/frontend/hass-console-summary-card.js` — same treatment for the severity gauges; glow/pulse gated on `default`; `SVER` bumped.
+- `custom_components/hass_console/manifest.json` — version `3.2.0`.
+- `CHANGELOG.md`, `README.md`, `ROADMAP.md` — documentation updated for the new option; roadmap item marked shipped.
 
 ---
 

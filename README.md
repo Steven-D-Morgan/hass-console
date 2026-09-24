@@ -707,6 +707,7 @@ log_csv: /local/hass-console/logs.csv
 rows: 200
 refresh_interval: 30
 theme: auto
+appearance: default
 show_alarm: true
 show_log: true
 ```
@@ -718,17 +719,25 @@ show_log: true
 | `log_csv` | `/local/hass-console/logs.csv` | URL to log CSV |
 | `rows` | 200 | Max rows to display per tab |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
-| `theme` | auto | `auto` (follows HA theme), `dark`, or `light` |
+| `theme` | auto | `auto` (follows HA theme), `dark`, or `light` — dark/light mode following |
+| `appearance` | default | `default` (Niagara look) or `hass_ui` (native Home Assistant styling) |
 | `show_alarm` | true | Set to `false` to hide the Alarm tab |
 | `show_log` | true | Set to `false` to hide the Log tab |
 
 ### Theme Support
 
-The card adapts to Home Assistant's active theme. In `auto` mode, it reads HA's background color to determine light or dark, then sets all colors, backgrounds, and borders to match. Alarm severity colors (red/amber/blue) stay fixed in both modes for visual consistency.
+The card adapts to Home Assistant's active theme. In `auto` mode, it reads HA's background color to determine light or dark, then sets all colors, backgrounds, and borders to match.
 
 - **`auto`** — detects HA's current theme. If you switch between light and dark in HA, the card follows.
 - **`dark`** — forces the dark console look regardless of HA theme. The original HASS Console aesthetic.
 - **`light`** — forces light mode. Clean white background with dark text.
+
+### Appearance — Default vs. HASS UI
+
+`theme` controls dark/light mode; `appearance` controls the *visual style* — how tightly the card wants to match Home Assistant's own cards on the same dashboard. The two combine independently, so `appearance: hass_ui, theme: auto` gets you HA-native styling that still tracks the user's dark/light preference.
+
+- **`default`** (unchanged) — the Niagara-inspired look. Monospace font, uppercase headers, a pulsing accent dot, and fixed red/amber/blue severity colors that stay consistent across every dashboard.
+- **`hass_ui`** — restyles the card so it reads as a native HA surface next to Weather / Media / Entities cards. Backgrounds, text, dividers, and accents come from HA's CSS variables (`--ha-card-background`, `--primary-text-color`, `--divider-color`, `--primary-color`), so if your active theme paints the rest of the dashboard, the console picks up the same colors. Severity chips remap to HA's state colors (`--error-color` → Critical, `--warning-color` → Major, `--info-color` → Minor, `--success-color` → cleared/ACK'd). Typography switches to HA's Roboto/Noto sans-serif with normal case.
 
 ### Show/Hide Tabs
 
@@ -786,34 +795,28 @@ The summary card is bundled with the integration and loads automatically — no 
 
 ```yaml
 type: custom:hass-console-summary-card
-title: Console Status
 alarm_csv: /local/hass-console/alarms.csv
-log_csv: /local/hass-console/logs.csv
 refresh_interval: 30
 theme: auto
-show_trend: true
-show_log_count: true
+appearance: default
 ```
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `title` | Console Status | Card header text |
 | `alarm_csv` | `/local/hass-console/alarms.csv` | URL to alarm CSV |
-| `log_csv` | `/local/hass-console/logs.csv` | URL to log CSV |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
-| `theme` | auto | `auto`, `dark`, or `light` |
-| `show_trend` | true | Show the 7-day alarm trend sparkline |
-| `show_log_count` | true | Show total log entry count in stats |
+| `theme` | auto | `auto`, `dark`, or `light` — dark/light mode following |
+| `appearance` | default | `default` (Niagara look with pulsing glow) or `hass_ui` (native HA state colors, no glow) |
 
 ### What it shows
 
-**Status indicator** — a glowing dot and label that reflects the highest active severity: CRITICAL (red, blinking), ATTENTION (amber), MINOR (blue), or ALL CLEAR (green). Determined by unacknowledged alarms only.
+Three severity gauges, side-by-side, counting **unacknowledged** alarms by class:
 
-**Severity gauges** — large numbers for Critical, Major, and Minor unacknowledged alarm counts. An "Other" gauge appears if you use custom class values beyond 01/02/03.
+- **Critical** — count of unacknowledged alarms with `class: 01`. In `appearance: default`, the tile pulses when non-zero to draw the eye.
+- **Major** — count of unacknowledged alarms with `class: 02`.
+- **Minor** — count of unacknowledged alarms with `class: 03`.
 
-**Stats row** — unacknowledged count, acknowledged count, total alarms, and total log entries.
-
-**7-day alarm trend** — a sparkline bar chart showing alarm volume per day for the last week. Bar color scales from green (low) to amber to red (high). Hover a bar to see the exact date and count. Useful for spotting patterns — are alarms increasing? Did something change on Tuesday?
+That's the whole card — three numbers, always visible, refreshed on the interval. When a severity is non-zero the tile picks up its state color (red / amber / blue in `default`; HA's `--error-color` / `--warning-color` / `--info-color` in `hass_ui`).
 
 ---
 

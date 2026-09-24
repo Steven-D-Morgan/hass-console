@@ -1,5 +1,5 @@
 /**
- * HASS Console Card v3.1.0
+ * HASS Console Card v3.2.0
  *
  * CONFIG:
  *   type: custom:hass-console-card
@@ -8,21 +8,23 @@
  *   log_csv: /local/hass-console/logs.csv
  *   rows: 200
  *   refresh_interval: 30
- *   theme: auto          # auto | dark | light
+ *   theme: auto          # auto | dark | light  (dark/light mode following)
+ *   appearance: default  # default | hass_ui   (visual style — Niagara vs. native HA)
  *   show_alarm: true     # show the Alarm tab (default true)
  *   show_log: true       # show the Log tab (default true)
  */
-const VER="3.1.0";
+const VER="3.2.0";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
 constructor(){super();this.attachShadow({mode:"open"});this._c={};this._alarm=[];this._log=[];this._tab="ALARM";this._timer=null;this._sortCol=null;this._sortDir="desc";
-this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto"}
+this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto";this._appearance="default"}
 
 setConfig(c){
 this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30,
 showAlarm:c.show_alarm!==false,showLog:c.show_log!==false};
 this._theme=c.theme||"auto";
+this._appearance=c.appearance==="hass_ui"?"hass_ui":"default";
 if(!this._c.showAlarm&&this._c.showLog)this._tab="LOG";
 if(this._c.showAlarm&&!this._c.showLog)this._tab="ALARM";
 }
@@ -35,6 +37,31 @@ if(!bg)return true;
 const m=bg.match(/\d+/g);if(!m||m.length<3)return true;
 const lum=(parseInt(m[0])*299+parseInt(m[1])*587+parseInt(m[2])*114)/1000;
 return lum<128}
+
+// Resolve all colors + font up front so the CSS template stays declarative.
+// `default` keeps the Niagara palette (unchanged); `hass_ui` maps everything
+// onto HA's CSS variables so the card sits natively next to other HA cards.
+_palette(dk,app){const isHass=app==="hass_ui";return{
+bg:isHass?'var(--ha-card-background, var(--card-background-color, #fff))':(dk?'#0c1117':'var(--ha-card-background, var(--card-background-color, #ffffff))'),
+sf:isHass?'var(--secondary-background-color, #f5f5f5)':(dk?'#141b24':'var(--secondary-background-color, #f5f5f5)'),
+hbg:isHass?'var(--secondary-background-color, #fafafa)':(dk?'#0f1820':'var(--secondary-background-color, #fafafa)'),
+bd:isHass?'var(--divider-color, #e0e0e0)':(dk?'#1e2a36':'var(--divider-color, #e0e0e0)'),
+tx:isHass?'var(--primary-text-color, #212121)':(dk?'#c8d6e0':'var(--primary-text-color, #212121)'),
+dim:isHass?'var(--secondary-text-color, #727272)':(dk?'#6b7f8e':'var(--secondary-text-color, #727272)'),
+ac:isHass?'var(--primary-color, #03a9f4)':(dk?'#00d4aa':'var(--accent-color, #03a9f4)'),
+red:isHass?'var(--error-color, #db4437)':'#ff4757',
+amb:isHass?'var(--warning-color, #ffa726)':'#ffa502',
+blu:isHass?'var(--info-color, #039be5)':'#3b82f6',
+grn:isHass?'var(--success-color, #43a047)':'#2ed573',
+redRgb:isHass?'var(--rgb-error-color, 219,68,55)':'255,71,87',
+ambRgb:isHass?'var(--rgb-warning-color, 255,167,38)':'255,165,2',
+bluRgb:isHass?'var(--rgb-info-color, 3,155,229)':'59,130,246',
+grnRgb:isHass?'var(--rgb-success-color, 67,160,71)':'46,213,115',
+acRgb:isHass?'var(--rgb-primary-color, 3,169,244)':(dk?'0,212,170':'3,169,244'),
+dimRgb:isHass?'var(--rgb-primary-text-color, 0,0,0)':(dk?'200,214,224':'0,0,0'),
+hov:isHass?'rgba(var(--rgb-primary-text-color, 0,0,0), .04)':(dk?'rgba(0,212,170,.06)':'rgba(0,0,0,.03)'),
+fn:isHass?'var(--paper-font-body1_-_font-family, Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif)':'"SF Mono","Cascadia Code","JetBrains Mono","Fira Code",monospace'
+}}
 
 _startRefresh(){if(this._timer)clearInterval(this._timer);this._timer=setInterval(()=>this._fetch(),this._c.refresh*1000)}
 async _fetch(){await Promise.all([
@@ -76,18 +103,22 @@ async _ackAll(){if(!this._hass)return;await this._hass.callService("hass_console
 
 _render(){
 const dk=this._isDark();
+const app=this._appearance;
+const P=this._palette(dk,app);
 const S=`
 :host{
-  --bg:${dk?'#0c1117':'var(--ha-card-background, var(--card-background-color, #ffffff))'};
-  --sf:${dk?'#141b24':'var(--secondary-background-color, #f5f5f5)'};
-  --bd:${dk?'#1e2a36':'var(--divider-color, #e0e0e0)'};
-  --tx:${dk?'#c8d6e0':'var(--primary-text-color, #212121)'};
-  --dim:${dk?'#6b7f8e':'var(--secondary-text-color, #727272)'};
-  --ac:${dk?'#00d4aa':'var(--accent-color, #03a9f4)'};
-  --red:#ff4757;--amb:#ffa502;--blu:#3b82f6;--grn:#2ed573;
-  --hbg:${dk?'#0f1820':'var(--secondary-background-color, #fafafa)'};
-  --hov:${dk?'rgba(0,212,170,.06)':'rgba(0,0,0,.03)'};
-  --fn:"SF Mono","Cascadia Code","JetBrains Mono","Fira Code",monospace;
+  --bg:${P.bg};
+  --sf:${P.sf};
+  --bd:${P.bd};
+  --tx:${P.tx};
+  --dim:${P.dim};
+  --ac:${P.ac};
+  --red:${P.red};--amb:${P.amb};--blu:${P.blu};--grn:${P.grn};
+  --red-rgb:${P.redRgb};--amb-rgb:${P.ambRgb};--blu-rgb:${P.bluRgb};--grn-rgb:${P.grnRgb};
+  --ac-rgb:${P.acRgb};--dim-rgb:${P.dimRgb};
+  --hbg:${P.hbg};
+  --hov:${P.hov};
+  --fn:${P.fn};
 }
 *{box-sizing:border-box;margin:0;padding:0}
 .wrap{background:var(--bg);border:1px solid var(--bd);border-radius:12px;overflow:hidden;font-family:var(--fn);font-size:12px;color:var(--tx)}
@@ -101,17 +132,17 @@ const S=`
 .tbtn:hover{color:var(--tx)}.tbtn.active{color:var(--ac)}
 .tbtn.active::after{content:"";position:absolute;bottom:-2px;left:10%;width:80%;height:2px;background:var(--ac);border-radius:1px}
 .badge{display:inline-block;min-width:18px;padding:1px 5px;margin-left:6px;border-radius:9px;font-size:10px;font-weight:700;background:var(--bd);color:var(--dim)}
-.tbtn.active .badge{background:${dk?'rgba(0,212,170,.15)':'rgba(3,169,244,.12)'};color:var(--ac)}
-.badge-unack{background:rgba(255,71,87,.15);color:var(--red)}
+.tbtn.active .badge{background:rgba(var(--ac-rgb),.15);color:var(--ac)}
+.badge-unack{background:rgba(var(--red-rgb),.15);color:var(--red)}
 .toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--sf);border-bottom:1px solid var(--bd);flex-wrap:wrap}
 .finput{flex:1;min-width:120px;padding:6px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:var(--fn);font-size:11px;outline:none}
-.finput:focus{border-color:var(--ac);box-shadow:0 0 0 2px ${dk?'rgba(0,212,170,.15)':'rgba(3,169,244,.15)'}}
+.finput:focus{border-color:var(--ac);box-shadow:0 0 0 2px rgba(var(--ac-rgb),.15)}
 .finput::placeholder{color:var(--dim)}
 .btn{padding:5px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--dim);font-family:var(--fn);font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap}
 .btn:hover{border-color:var(--ac);color:var(--ac)}
-.btn.has{border-color:var(--ac);color:var(--ac);background:${dk?'rgba(0,212,170,.08)':'rgba(3,169,244,.08)'}}
-.btn.ack-all{border-color:var(--red);color:var(--red)}.btn.ack-all:hover{background:rgba(255,71,87,.1)}
-.btn.show-ack.active{border-color:var(--ac);color:var(--ac);background:${dk?'rgba(0,212,170,.08)':'rgba(3,169,244,.08)'}}
+.btn.has{border-color:var(--ac);color:var(--ac);background:rgba(var(--ac-rgb),.08)}
+.btn.ack-all{border-color:var(--red);color:var(--red)}.btn.ack-all:hover{background:rgba(var(--red-rgb),.1)}
+.btn.show-ack.active{border-color:var(--ac);color:var(--ac);background:rgba(var(--ac-rgb),.08)}
 .fcnt{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;font-size:9px;font-weight:800;background:var(--ac);color:var(--bg);margin-left:4px}
 .fpanel{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;background:var(--hbg);border-bottom:0px solid var(--bd)}
 .fpanel.open{max-height:500px;padding:12px 14px;border-bottom-width:1px}
@@ -122,10 +153,10 @@ const S=`
 .fdate:focus{border-color:var(--ac)}.fdate::-webkit-calendar-picker-indicator{filter:${dk?'invert(.7)':'none'}}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--sf);color:var(--dim);transition:all .15s;user-select:none}
-.chip:hover{border-color:var(--dim)}.chip.sel{border-color:var(--ac);color:var(--ac);background:${dk?'rgba(0,212,170,.1)':'rgba(3,169,244,.08)'}}
-.chip.c01.sel{border-color:var(--red);color:var(--red);background:rgba(255,71,87,.1)}
-.chip.c02.sel{border-color:var(--amb);color:var(--amb);background:rgba(255,165,2,.1)}
-.chip.c03.sel{border-color:var(--blu);color:var(--blu);background:rgba(59,130,246,.1)}
+.chip:hover{border-color:var(--dim)}.chip.sel{border-color:var(--ac);color:var(--ac);background:rgba(var(--ac-rgb),.1)}
+.chip.c01.sel{border-color:var(--red);color:var(--red);background:rgba(var(--red-rgb),.1)}
+.chip.c02.sel{border-color:var(--amb);color:var(--amb);background:rgba(var(--amb-rgb),.1)}
+.chip.c03.sel{border-color:var(--blu);color:var(--blu);background:rgba(var(--blu-rgb),.1)}
 .factions{display:flex;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)}
 .fclr{padding:4px 12px;border:1px solid var(--bd);border-radius:6px;background:none;color:var(--dim);font-family:var(--fn);font-size:10px;cursor:pointer}.fclr:hover{border-color:var(--red);color:var(--red)}
 .drow{display:flex;align-items:center;gap:6px}.drow span{font-size:10px;color:var(--dim);font-weight:600}
@@ -139,20 +170,32 @@ tbody tr{border-bottom:1px solid var(--bd);transition:background .1s}tbody tr:ho
 tbody tr.acked{opacity:.45}
 td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-size:11.5px}
 .clb{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
-.c01{background:rgba(255,71,87,.15);color:var(--red)}.c02{background:rgba(255,165,2,.15);color:var(--amb)}.c03{background:rgba(59,130,246,.15);color:var(--blu)}.cdf{background:${dk?'rgba(200,214,224,.1)':'rgba(0,0,0,.06)'};color:var(--dim)}
-.catb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:${dk?'rgba(0,212,170,.1)':'rgba(3,169,244,.08)'};color:var(--ac);border:1px solid ${dk?'rgba(0,212,170,.25)':'rgba(3,169,244,.2)'}}
+.c01{background:rgba(var(--red-rgb),.15);color:var(--red)}.c02{background:rgba(var(--amb-rgb),.15);color:var(--amb)}.c03{background:rgba(var(--blu-rgb),.15);color:var(--blu)}.cdf{background:rgba(var(--dim-rgb),.08);color:var(--dim)}
+.catb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(var(--ac-rgb),.1);color:var(--ac);border:1px solid rgba(var(--ac-rgb),.25)}
 .tsd{color:var(--dim)}.tst{color:var(--tx);font-weight:600}
-.ack-btn{padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:rgba(255,71,87,.08);color:var(--red);font-family:var(--fn);font-size:9px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px}
-.ack-btn:hover{background:rgba(255,71,87,.2)}
+.ack-btn{padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:rgba(var(--red-rgb),.08);color:var(--red);font-family:var(--fn);font-size:9px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px}
+.ack-btn:hover{background:rgba(var(--red-rgb),.2)}
 .ack-done{font-size:10px;color:var(--grn);font-weight:600}
 .empty{padding:48px 16px;text-align:center;color:var(--dim)}.empty .icon{font-size:32px;margin-bottom:8px}.empty .msg{font-size:13px}
 .foot{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sf);border-top:1px solid var(--bd);font-size:10px;color:var(--dim)}
 .ftags{display:flex;gap:6px;flex-wrap:wrap}
-.ftag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:${dk?'rgba(0,212,170,.1)':'rgba(3,169,244,.08)'};color:var(--ac);border:1px solid ${dk?'rgba(0,212,170,.2)':'rgba(3,169,244,.2)'}}
-.ftag .x{cursor:pointer;font-weight:800;margin-left:2px;opacity:.6}.ftag .x:hover{opacity:1}`;
+.ftag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:rgba(var(--ac-rgb),.1);color:var(--ac);border:1px solid rgba(var(--ac-rgb),.25)}
+.ftag .x{cursor:pointer;font-weight:800;margin-left:2px;opacity:.6}.ftag .x:hover{opacity:1}
+
+/* appearance: hass_ui — structural overrides so the card reads as a native HA card.
+   Colors flow through the CSS custom props above; these rules soften the Niagara-y
+   text treatment (uppercase, wide letter-spacing, pulsing dot) that survives palette swaps. */
+.wrap[data-app="hass_ui"] .htitle{text-transform:none;letter-spacing:.2px;font-weight:500;font-size:15px;color:var(--tx)}
+.wrap[data-app="hass_ui"] .htitle .dot{display:none}
+.wrap[data-app="hass_ui"] .tbtn{text-transform:none;letter-spacing:.4px;font-weight:500;font-size:13px}
+.wrap[data-app="hass_ui"] thead th{text-transform:none;letter-spacing:.3px;font-size:11px;font-weight:500}
+.wrap[data-app="hass_ui"] .flbl{text-transform:none;letter-spacing:.3px;font-size:10px;font-weight:600}
+.wrap[data-app="hass_ui"] .clb{text-transform:none;letter-spacing:0;font-weight:600}
+.wrap[data-app="hass_ui"] .ack-btn{text-transform:none;letter-spacing:.3px;font-weight:600}
+.wrap[data-app="hass_ui"] .catb{text-transform:none;letter-spacing:0}`;
 
 this.shadowRoot.innerHTML=`<style>${S}</style>
-<div class="wrap">
+<div class="wrap" data-app="${app}">
 <div class="hbar"><div class="htitle"><span class="dot"></span>${this._c.title}</div><div class="hmeta" id="meta"></div></div>
 <div class="tbar" id="tabs"></div>
 <div class="toolbar" id="toolbar">
@@ -265,7 +308,7 @@ return this._esc(v)}
 _esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
 getCardSize(){return 8}
 disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
-static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30}}
+static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30,appearance:"default"}}
 }
 
 if(!customElements.get("hass-console-card")){
