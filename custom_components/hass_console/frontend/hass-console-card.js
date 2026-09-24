@@ -1,5 +1,5 @@
 /**
- * HASS Console Card v3.2.0
+ * HASS Console Card v3.2.1
  *
  * CONFIG:
  *   type: custom:hass-console-card
@@ -9,22 +9,22 @@
  *   rows: 200
  *   refresh_interval: 30
  *   theme: auto          # auto | dark | light  (dark/light mode following)
- *   appearance: default  # default | hass_ui   (visual style — Niagara vs. native HA)
+ *   appearance: hass_ui  # hass_ui | default   (visual style — native HA vs. Niagara)
  *   show_alarm: true     # show the Alarm tab (default true)
  *   show_log: true       # show the Log tab (default true)
  */
-const VER="3.2.0";
+const VER="3.2.1";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
 constructor(){super();this.attachShadow({mode:"open"});this._c={};this._alarm=[];this._log=[];this._tab="ALARM";this._timer=null;this._sortCol=null;this._sortDir="desc";
-this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto";this._appearance="default"}
+this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto";this._appearance="hass_ui"}
 
 setConfig(c){
 this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30,
 showAlarm:c.show_alarm!==false,showLog:c.show_log!==false};
 this._theme=c.theme||"auto";
-this._appearance=c.appearance==="hass_ui"?"hass_ui":"default";
+this._appearance=c.appearance==="default"?"default":"hass_ui";
 if(!this._c.showAlarm&&this._c.showLog)this._tab="LOG";
 if(this._c.showAlarm&&!this._c.showLog)this._tab="ALARM";
 }
@@ -308,7 +308,7 @@ return this._esc(v)}
 _esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
 getCardSize(){return 8}
 disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
-static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30,appearance:"default"}}
+static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30,appearance:"hass_ui"}}
 }
 
 if(!customElements.get("hass-console-card")){

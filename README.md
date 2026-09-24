@@ -42,6 +42,7 @@ If you've used a Niagara AX/N4 alarm console, you know the value of a single pan
 - [Entity Naming Convention](#entity-naming-convention)
 - [Cron Reference](#cron-reference)
 - [Real-World Examples](#real-world-examples)
+- [Cookbook](COOKBOOK.md) — copy-pasteable recipes for automations and full point sets
 - [Troubleshooting](#troubleshooting)
 - [Author & License](#author--license)
 
@@ -707,7 +708,7 @@ log_csv: /local/hass-console/logs.csv
 rows: 200
 refresh_interval: 30
 theme: auto
-appearance: default
+appearance: hass_ui
 show_alarm: true
 show_log: true
 ```
@@ -720,7 +721,7 @@ show_log: true
 | `rows` | 200 | Max rows to display per tab |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
 | `theme` | auto | `auto` (follows HA theme), `dark`, or `light` — dark/light mode following |
-| `appearance` | default | `default` (Niagara look) or `hass_ui` (native Home Assistant styling) |
+| `appearance` | hass_ui | `hass_ui` (native Home Assistant styling, default) or `default` (Niagara look) |
 | `show_alarm` | true | Set to `false` to hide the Alarm tab |
 | `show_log` | true | Set to `false` to hide the Log tab |
 
@@ -798,7 +799,7 @@ type: custom:hass-console-summary-card
 alarm_csv: /local/hass-console/alarms.csv
 refresh_interval: 30
 theme: auto
-appearance: default
+appearance: hass_ui
 ```
 
 | Key | Default | Description |
@@ -806,7 +807,7 @@ appearance: default
 | `alarm_csv` | `/local/hass-console/alarms.csv` | URL to alarm CSV |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
 | `theme` | auto | `auto`, `dark`, or `light` — dark/light mode following |
-| `appearance` | default | `default` (Niagara look with pulsing glow) or `hass_ui` (native HA state colors, no glow) |
+| `appearance` | hass_ui | `hass_ui` (native HA state colors, no glow — default) or `default` (Niagara look with pulsing glow) |
 
 ### What it shows
 
@@ -908,87 +909,13 @@ service: hass_console.reload
 
 ## Using HASS Console in Automations
 
-### Log a door open event as an alarm
+The three write services (`write_log`, `write_alarm`, `acknowledge_alarm`) plug into any HA automation trigger. See the **[Cookbook → Automations](COOKBOOK.md#automations)** for full copy-pasteable recipes covering:
 
-```yaml
-automation:
-  - alias: "Console — Garage door alarm"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.garage_door
-        to: "on"
-    action:
-      - service: hass_console.write_alarm
-        data:
-          entity: hass_console.alarm_garage_door
-          category: SECURITY
-          class: "02"
-          value: "OPEN"
-          note: "Garage door opened"
-          trigger: "binary_sensor.garage_door → on"
-```
-
-### Log daily HVAC runtime
-
-```yaml
-automation:
-  - alias: "Console — HVAC runtime at midnight"
-    trigger:
-      - platform: time
-        at: "23:59:00"
-    action:
-      - service: hass_console.write_log
-        data:
-          entity: hass_console.log_hvac_runtime
-          category: HVAC
-          value: "{{ states('sensor.hvac_total_runtime_today') }}"
-          note: "End-of-day HVAC runtime"
-```
-
-### Auto-acknowledge alarms at shift change
-
-```yaml
-automation:
-  - alias: "Console — Auto-ACK at 7am"
-    trigger:
-      - platform: time
-        at: "07:00:00"
-    action:
-      - service: hass_console.acknowledge_all
-```
-
-### Acknowledge a specific alarm from a notification action
-
-```yaml
-automation:
-  - alias: "Console — ACK from phone notification"
-    trigger:
-      - platform: event
-        event_type: mobile_app_notification_action
-        event_data:
-          action: ACK_ALARM
-    action:
-      - service: hass_console.acknowledge_alarm
-        data:
-          id: "{{ trigger.event.data.alarm_id }}"
-```
-
-### Log internet speed test results
-
-```yaml
-automation:
-  - alias: "Console — Speed test log"
-    trigger:
-      - platform: state
-        entity_id: sensor.speedtest_download
-    action:
-      - service: hass_console.write_log
-        data:
-          entity: hass_console.log_speedtest
-          category: NETWORK
-          value: "{{ states('sensor.speedtest_download') }} down / {{ states('sensor.speedtest_upload') }} up"
-          note: "Speed test result"
-```
+- Logging a door open as an alarm
+- Snapshotting daily HVAC runtime at midnight
+- Auto-acknowledging all alarms at shift change
+- Acknowledging a specific alarm from a mobile notification action
+- Logging internet speed test results on every run
 
 ---
 
@@ -1060,97 +987,10 @@ day-of-month and day-of-week fields are restricted (neither is `*`), the schedul
 
 ## Real-World Examples
 
-### Home energy monitoring
+Full end-to-end point sets — the kind of `console.yaml` block you'd drop into an actual install — live in the **[Cookbook → Full point sets](COOKBOOK.md#full-point-sets)**:
 
-```yaml
-DAILY_KWH:
-  type: LOG
-  cron: "0 0 * * *"
-  entity: sensor.grid_consumption_kwh
-  category: E-METER
-  note: "Daily grid consumption"
-
-DAILY_SOLAR:
-  type: LOG
-  cron: "0 0 * * *"
-  entity: sensor.solar_production_kwh
-  category: E-METER
-  note: "Daily solar production"
-
-HOURLY_DEMAND:
-  type: LOG
-  cron: "0 * * * *"
-  entity: sensor.main_panel_watts
-  category: E-METER
-  note: "Hourly demand reading"
-
-HIGH_DEMAND:
-  type: ALARM
-  class: "01"
-  category: E-METER
-  entity: sensor.main_panel_watts
-  note: "Excessive power draw"
-  trigger:
-    - alias: "Above 8kW for 5 min"
-      platform: numeric_state
-      entity_id: sensor.main_panel_watts
-      above: 8000
-      for:
-        minutes: 5
-
-BATTERY_LOW:
-  type: ALARM
-  class: "03"
-  category: E-METER
-  entity: sensor.powerwall_battery_level
-  note: "Home battery low"
-  trigger:
-    - alias: "Below 15% for 10 min"
-      platform: numeric_state
-      entity_id: sensor.powerwall_battery_level
-      below: 15
-      for:
-        minutes: 10
-```
-
-### Server room monitoring
-
-```yaml
-TEMP_15MIN:
-  type: LOG
-  cron: "*/15 * * * *"
-  entity: sensor.rack_inlet_temperature
-  category: HVAC
-  note: "Rack inlet temp"
-
-OVERHEAT:
-  type: ALARM
-  class: "01"
-  category: HVAC
-  entity: sensor.rack_inlet_temperature
-  note: "Rack inlet overheating"
-  trigger:
-    - alias: "Above 85°F for 5 min"
-      platform: numeric_state
-      entity_id: sensor.rack_inlet_temperature
-      above: 85
-      for:
-        minutes: 5
-
-UPS_CRITICAL:
-  type: ALARM
-  class: "01"
-  category: UPS
-  entity: sensor.ups_battery_percent
-  note: "UPS battery critical"
-  trigger:
-    - alias: "Below 10% for 2 min"
-      platform: numeric_state
-      entity_id: sensor.ups_battery_percent
-      below: 10
-      for:
-        minutes: 2
-```
+- **Home energy monitoring** — daily kWh + solar snapshots, hourly demand, over-draw and low-battery alarms.
+- **Server room monitoring** — 15-minute inlet-temp logging plus rack overheat and UPS-critical alarms.
 
 ---
 

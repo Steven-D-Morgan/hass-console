@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.2.1](#v321--2026-09-24) | 2026-09-24 | `appearance: hass_ui` is now the default; opt back into the Niagara look with `appearance: default` |
 | [v3.2.0](#v320--2026-09-24) | 2026-09-24 | Card `appearance: hass_ui` — native Home Assistant look for both cards |
 | [v3.1.0](#v310--2026-08-25) | 2026-08-25 | AND-conditions editor in the UI; one-click YAML import via Repairs |
 | [v3.0.0](#v300--2026-08-21) | 2026-08-21 | Promotion of `v3.0.0-rc1` to stable — no code changes |
@@ -26,6 +27,30 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v2.0.0](#v200--2026-06-05) | 2026-06-05 | Dual CSV output + documentation rewrite |
 | [v1.1.0](#v110--2026-06-05) | 2026-06-05 | Collapsible filter panel |
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
+
+---
+
+## v3.2.1 — 2026-09-24
+
+### 🎨 `hass_ui` is now the default card appearance
+
+v3.2.0 shipped the HA-native look as an opt-in. In practice it's the right default for almost every dashboard — cards should read as first-class HA surfaces, not stand out from the rest of the UI — so this release flips the default. The Niagara-inspired look is still one line of YAML away for anyone who prefers it.
+
+- **`appearance` now defaults to `hass_ui`** on both `hass-console-card` and `hass-console-summary-card`. Any card without an explicit `appearance:` key picks up the HA-native styling.
+- **Opt back into the original look** with `appearance: default` in the card YAML. Nothing was removed; the Niagara palette, pulsing glow, and monospace headers still render exactly as before.
+- **Stub configs updated** — the visual card editor's starter YAML for both cards now emits `appearance: hass_ui`.
+
+### Impact
+
+Existing dashboards that already set `appearance: hass_ui` or `appearance: default` explicitly are unaffected. Cards that omit the key will render in `hass_ui` on refresh — a visual change, not a behavioral one. No data migration.
+
+### Files changed
+
+- `custom_components/hass_console/frontend/hass-console-card.js` — default and coercion flipped; stub config updated; `VER` bumped.
+- `custom_components/hass_console/frontend/hass-console-summary-card.js` — same treatment; `SVER` bumped.
+- `custom_components/hass_console/manifest.json` — version `3.2.1`.
+- `README.md` — configuration tables and example YAML updated to reflect the new default; the long "Using HASS Console in Automations" and "Real-World Examples" sections trimmed down to pointers into the new Cookbook (~160 fewer lines).
+- `COOKBOOK.md` — filled in with the five automation recipes and two full point sets that used to live in the README, plus a table of contents and per-recipe *why* notes.
 
 ---
 

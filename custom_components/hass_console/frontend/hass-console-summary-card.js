@@ -1,5 +1,5 @@
 /**
- * HASS Console Summary Card v3.2.0
+ * HASS Console Summary Card v3.2.1
  *
  * Minimalist alarm severity gauges. Three numbers. That's it.
  *
@@ -7,10 +7,10 @@
  *   type: custom:hass-console-summary-card
  *   alarm_csv: /local/hass-console/alarms.csv
  *   theme: auto           # auto | dark | light  (dark/light mode following)
- *   appearance: default   # default | hass_ui   (visual style — Niagara vs. native HA)
+ *   appearance: hass_ui   # hass_ui | default   (visual style — native HA vs. Niagara)
  *   refresh_interval: 30
  */
-const SVER = "3.2.0";
+const SVER = "3.2.1";
 
 class HassConsoleSummaryCard extends HTMLElement {
   constructor() {
@@ -20,7 +20,7 @@ class HassConsoleSummaryCard extends HTMLElement {
     this._alarm = [];
     this._timer = null;
     this._theme = "auto";
-    this._appearance = "default";
+    this._appearance = "hass_ui";
   }
 
   setConfig(c) {
@@ -29,7 +29,7 @@ class HassConsoleSummaryCard extends HTMLElement {
       refresh: c.refresh_interval || 30,
     };
     this._theme = c.theme || "auto";
-    this._appearance = c.appearance === "hass_ui" ? "hass_ui" : "default";
+    this._appearance = c.appearance === "default" ? "default" : "hass_ui";
   }
 
   set hass(h) {
@@ -170,7 +170,7 @@ ${isHass ? "" : `.gauge.glow.crit{animation:pulse 2s infinite}`}
   getCardSize() { return 2; }
   disconnectedCallback() { if (this._timer) clearInterval(this._timer); }
   static getStubConfig() {
-    return { alarm_csv: "/local/hass-console/alarms.csv", refresh_interval: 30, theme: "auto", appearance: "default" };
+    return { alarm_csv: "/local/hass-console/alarms.csv", refresh_interval: 30, theme: "auto", appearance: "hass_ui" };
   }
 }
 
