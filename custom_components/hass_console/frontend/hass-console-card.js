@@ -1,4 +1,4 @@
-const VER="3.3.0";
+const VER="3.3.2";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
@@ -275,8 +275,8 @@ tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class=
 else{tbody.innerHTML=rows.map(r=>{
 const isA=!!(r.ack);const trC=isA?"acked":"";
 return`<tr class="${trC}">${cols.map(c=>{
-if(c.k==="_ack"){if(isA)return`<td><span class="ack-done" title="${this._esc(r.ack_note||"")}">✓ ${this._esc(r.ack)}</span></td>`;
-return`<td><button class="ack-btn" data-id="${this._esc(r.id||"")}">ACK</button></td>`}
+if(c.k==="_ack"){if(isA)return`<td><span class="ack-done" title="${this._escAttr(r.ack_note||"")}">✓ ${this._esc(r.ack)}</span></td>`;
+return`<td><button class="ack-btn" data-id="${this._escAttr(r.id||"")}">ACK</button></td>`}
 return`<td>${this._fmt(c.k,r[c.k]||"")}</td>`}).join("")}</tr>`}).join("")}
 
 tbody.querySelectorAll(".ack-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();this._ack(b.dataset.id)}));

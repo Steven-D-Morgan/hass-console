@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.3.2](#v332--2026-11-03) | 2026-11-03 | Card hardening follow-up — `ack_note` tooltip and `data-id` on the ACK button now escape attribute values via `_escAttr` instead of `_esc`. Bundled card version bumped to match the integration. |
 | [v3.3.1](#v331--2026-11-03) | 2026-11-03 | 3.3.0 follow-ups — custom `target_csv` points no longer break setup, data view no longer blocks the event loop, card can view custom files via `/api/hass_console/file/<name>`, docs match the new paths |
 | [v3.3.0](#v330--2026-11-02) | 2026-11-02 | Security hardening — authenticated CSV endpoint, path-traversal fix, admin-only services, Lovelace card XSS fix |
 | [v3.2.1](#v321--2026-09-24) | 2026-09-24 | `appearance: hass_ui` is now the default; opt back into the Niagara look with `appearance: default` |
@@ -31,6 +32,23 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
 
 ---
+
+## v3.3.2 — 2026-11-03
+
+### 🛡️ Card hardening follow-up
+
+Advisory from `@frenck` on the hass/default#13009 approval review — the ack-cell renderer in `frontend/hass-console-card.js` was piping the acknowledgment tooltip and ACK button `data-id` through `_esc`, which escapes `<`, `>` and `&` but not quotes. `_escAttr` is already defined for exactly this case (and used for the filter chips and footer tags), so the ack cell should use it too.
+
+- **`title="${ack_note}"`** on the acknowledged-cell `<span class="ack-done">` now goes through `_escAttr` instead of `_esc`.
+- **`data-id="${r.id}"`** on the ACK `<button>` now goes through `_escAttr` instead of `_esc`.
+
+Not a bug on current installs — `ack_note` is admin-written (`acknowledge_alarm` / `acknowledge_all` are admin-only since 3.3.0) and `r.id` is a locally generated 8-char hex string, so no user-controlled quote has ever reached either attribute. Shipping it so the invariant is enforced by the renderer rather than by where the data happens to come from.
+
+### 🔖 Card versions bumped to match
+
+- `VER` in `hass-console-card.js` and `SVER` in `hass-console-summary-card.js` bumped from `3.3.0` to `3.3.2`. The 3.3.1 release raised the integration version but not the bundled card constants; this release puts them back in lockstep.
+
+Internal: no new helpers; this release only reuses the `_escAttr` added in 3.3.0.
 
 ## v3.3.1 — 2026-11-03
 
