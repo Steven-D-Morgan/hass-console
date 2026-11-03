@@ -142,12 +142,6 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class HassConsoleOptionsFlow(config_entries.OptionsFlow):
-    """Options flow — edit paths after initial setup.
-
-    Do NOT override __init__ to store config_entry — HA provides
-    self.config_entry automatically since 2024.11.
-    """
-
     async def async_step_init(self, user_input=None):
         errors: dict[str, str] = {}
         entry = self.config_entry

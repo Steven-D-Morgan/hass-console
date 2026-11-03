@@ -213,6 +213,10 @@
           "reload_failed": "Points were imported but the integration could not be reloaded automatically. Restart Home Assistant or reload HASS Console from its integration menu to activate them."
         }
       }
+    },
+    "legacy_www_path": {
+      "title": "HASS Console: CSV data is publicly accessible",
+      "description": "One or more of your HASS Console CSV files are stored under `/config/www/`, which Home Assistant serves at `/local/` without authentication — anyone who can reach your Home Assistant can download the alarm and log history, including the entity values logged there.\n\nAffected file(s): {paths}\n\n**Fix:** move each file to the integration data directory (`{data_dir}`) and update your `alarm_csv` / `log_csv` options in **Settings → Devices & Services → HASS Console → Configure** to the new location (or clear them to use the defaults). Then restart Home Assistant. New installs on 3.3.0+ default to the authenticated endpoint `/api/hass_console/alarm` and `/api/hass_console/log` instead."
     }
   }
 }

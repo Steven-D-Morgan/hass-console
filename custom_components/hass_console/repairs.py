@@ -107,7 +107,7 @@ class ImportYamlPointsFlow(RepairsFlow):
 
             try:
                 await hass.config_entries.async_reload(entry.entry_id)
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:
                 _LOGGER.warning(
                     "HASS Console: reload after YAML import failed: %s", err
                 )

@@ -1,16 +1,4 @@
-/**
- * HASS Console Summary Card v3.2.1
- *
- * Minimalist alarm severity gauges. Three numbers. That's it.
- *
- * CONFIG:
- *   type: custom:hass-console-summary-card
- *   alarm_csv: /local/hass-console/alarms.csv
- *   theme: auto           # auto | dark | light  (dark/light mode following)
- *   appearance: hass_ui   # hass_ui | default   (visual style — native HA vs. Niagara)
- *   refresh_interval: 30
- */
-const SVER = "3.2.1";
+const SVER = "3.3.0";
 
 class HassConsoleSummaryCard extends HTMLElement {
   constructor() {
@@ -25,7 +13,7 @@ class HassConsoleSummaryCard extends HTMLElement {
 
   setConfig(c) {
     this._c = {
-      alarm_csv: c.alarm_csv || "/local/hass-console/alarms.csv",
+      alarm_csv: c.alarm_csv || "/api/hass_console/alarm",
       refresh: c.refresh_interval || 30,
     };
     this._theme = c.theme || "auto";
@@ -59,7 +47,10 @@ class HassConsoleSummaryCard extends HTMLElement {
 
   async _fetch() {
     try {
-      const r = await fetch(this._c.alarm_csv + `?_=${Date.now()}`);
+      const u = this._c.alarm_csv + `?_=${Date.now()}`;
+      const r = (this._hass && typeof this._hass.fetchWithAuth === "function")
+        ? await this._hass.fetchWithAuth(u)
+        : await fetch(u);
       if (!r.ok) { this._alarm = []; this._render(); return; }
       const lines = (await r.text()).trim().split("\n");
       if (lines.length < 2) { this._alarm = []; this._render(); return; }
@@ -84,10 +75,6 @@ class HassConsoleSummaryCard extends HTMLElement {
     const c02 = unack.filter(r => r.class === "02").length;
     const c03 = unack.filter(r => r.class === "03").length;
 
-    // `default` keeps the Niagara hex palette; `hass_ui` swaps to HA CSS
-    // variables so the card sits natively next to other HA cards. Severity
-    // remaps to HA state colors so Critical/Major/Minor pick up the same
-    // hues badges and alerts use elsewhere in the dashboard.
     const bg      = isHass ? "var(--ha-card-background, var(--card-background-color, #fff))"
                            : (dk ? "#0c1117" : "var(--ha-card-background, var(--card-background-color, #fff))");
     const gaugeBg = isHass ? "var(--secondary-background-color, #f5f5f5)"
@@ -108,9 +95,6 @@ class HassConsoleSummaryCard extends HTMLElement {
       { n: c03, color: minColor,  label: "MINOR",    glow: c03 > 0 },
     ];
 
-    // In hass_ui the pulse/glow effect is dropped so the card looks like a
-    // regular HA info surface rather than a lit-up alarm panel; the number
-    // and border still color-shift with state so severity stays legible.
     const S = `
 :host{display:block}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -147,9 +131,6 @@ ${isHass ? "" : `.gauge.glow .gauge-num{text-shadow:0 0 16px var(--gc)60}`}
 ${isHass ? "" : `.gauge.glow.crit{animation:pulse 2s infinite}`}
 `;
 
-    // In hass_ui the CRITICAL label is title-cased for readability alongside
-    // the softened typography; other severity labels keep their original casing
-    // logic (all-caps in default, sentence-case in hass_ui via CSS).
     const displayLabel = (raw) => isHass
       ? raw.charAt(0) + raw.slice(1).toLowerCase()
       : raw;
@@ -170,7 +151,7 @@ ${isHass ? "" : `.gauge.glow.crit{animation:pulse 2s infinite}`}
   getCardSize() { return 2; }
   disconnectedCallback() { if (this._timer) clearInterval(this._timer); }
   static getStubConfig() {
-    return { alarm_csv: "/local/hass-console/alarms.csv", refresh_interval: 30, theme: "auto", appearance: "hass_ui" };
+    return { alarm_csv: "/api/hass_console/alarm", refresh_interval: 30, theme: "auto", appearance: "hass_ui" };
   }
 }
 

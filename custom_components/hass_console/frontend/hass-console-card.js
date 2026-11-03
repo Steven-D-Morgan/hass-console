@@ -1,19 +1,4 @@
-/**
- * HASS Console Card v3.2.1
- *
- * CONFIG:
- *   type: custom:hass-console-card
- *   title: HASS Console
- *   alarm_csv: /local/hass-console/alarms.csv
- *   log_csv: /local/hass-console/logs.csv
- *   rows: 200
- *   refresh_interval: 30
- *   theme: auto          # auto | dark | light  (dark/light mode following)
- *   appearance: hass_ui  # hass_ui | default   (visual style — native HA vs. Niagara)
- *   show_alarm: true     # show the Alarm tab (default true)
- *   show_log: true       # show the Log tab (default true)
- */
-const VER="3.2.1";
+const VER="3.3.0";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{
@@ -21,7 +6,7 @@ constructor(){super();this.attachShadow({mode:"open"});this._c={};this._alarm=[]
 this._fText="";this._fClass=new Set;this._fCat=new Set;this._fEnt=new Set;this._fFrom="";this._fTo="";this._filtersOpen=false;this._showAck=false;this._theme="auto";this._appearance="hass_ui"}
 
 setConfig(c){
-this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/local/hass-console/alarms.csv",log_csv:c.log_csv||"/local/hass-console/logs.csv",rows:c.rows||200,refresh:c.refresh_interval||30,
+this._c={title:c.title||"HASS Console",alarm_csv:c.alarm_csv||"/api/hass_console/alarm",log_csv:c.log_csv||"/api/hass_console/log",rows:c.rows||200,refresh:c.refresh_interval||30,
 showAlarm:c.show_alarm!==false,showLog:c.show_log!==false};
 this._theme=c.theme||"auto";
 this._appearance=c.appearance==="default"?"default":"hass_ui";
@@ -38,9 +23,6 @@ const m=bg.match(/\d+/g);if(!m||m.length<3)return true;
 const lum=(parseInt(m[0])*299+parseInt(m[1])*587+parseInt(m[2])*114)/1000;
 return lum<128}
 
-// Resolve all colors + font up front so the CSS template stays declarative.
-// `default` keeps the Niagara palette (unchanged); `hass_ui` maps everything
-// onto HA's CSS variables so the card sits natively next to other HA cards.
 _palette(dk,app){const isHass=app==="hass_ui";return{
 bg:isHass?'var(--ha-card-background, var(--card-background-color, #fff))':(dk?'#0c1117':'var(--ha-card-background, var(--card-background-color, #ffffff))'),
 sf:isHass?'var(--secondary-background-color, #f5f5f5)':(dk?'#141b24':'var(--secondary-background-color, #f5f5f5)'),
@@ -68,8 +50,18 @@ async _fetch(){await Promise.all([
 this._c.showAlarm?this._fetchOne("alarm"):Promise.resolve(),
 this._c.showLog?this._fetchOne("log"):Promise.resolve()
 ]);this._update()}
-async _fetchOne(t){try{const u=t==="alarm"?this._c.alarm_csv:this._c.log_csv;const r=await fetch(u+`?_=${Date.now()}`);if(!r.ok){if(t==="alarm")this._alarm=[];else this._log=[];return}
+async _fetchOne(t){try{const u=t==="alarm"?this._c.alarm_csv:this._c.log_csv;const full=u+`?_=${Date.now()}`;
+const r=(this._hass&&typeof this._hass.fetchWithAuth==="function")?await this._hass.fetchWithAuth(full):await fetch(full);
+if(!r.ok){if(t==="alarm")this._alarm=[];else this._log=[];return}
 const rows=this._parseCSV(await r.text());if(t==="alarm")this._alarm=rows;else this._log=rows}catch(e){console.error("HASS Console:",e)}}
+
+async _download(){const u=this._tab==="ALARM"?this._c.alarm_csv:this._c.log_csv;try{
+const r=(this._hass&&typeof this._hass.fetchWithAuth==="function")?await this._hass.fetchWithAuth(u):await fetch(u);
+if(!r.ok)throw new Error(`HTTP ${r.status}`);
+const blob=await r.blob();const url=URL.createObjectURL(blob);
+const a=document.createElement("a");a.href=url;a.download=`${this._tab.toLowerCase()}.csv`;a.click();
+URL.revokeObjectURL(url);
+}catch(e){console.error("HASS Console download:",e)}}
 
 _parseCSV(text){const lines=text.trim().split("\n");if(lines.length<2)return[];const hdr=this._split(lines[0]);const out=[];
 for(let i=1;i<lines.length;i++){const cols=this._split(lines[i]);if(cols.length<hdr.length)continue;const row={};hdr.forEach((h,j)=>row[h.trim()]=cols[j]?.trim()||"");out.push(row)}return out}
@@ -182,9 +174,6 @@ td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;ma
 .ftag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9px;background:rgba(var(--ac-rgb),.1);color:var(--ac);border:1px solid rgba(var(--ac-rgb),.25)}
 .ftag .x{cursor:pointer;font-weight:800;margin-left:2px;opacity:.6}.ftag .x:hover{opacity:1}
 
-/* appearance: hass_ui — structural overrides so the card reads as a native HA card.
-   Colors flow through the CSS custom props above; these rules soften the Niagara-y
-   text treatment (uppercase, wide letter-spacing, pulsing dot) that survives palette swaps. */
 .wrap[data-app="hass_ui"] .htitle{text-transform:none;letter-spacing:.2px;font-weight:500;font-size:15px;color:var(--tx)}
 .wrap[data-app="hass_ui"] .htitle .dot{display:none}
 .wrap[data-app="hass_ui"] .tbtn{text-transform:none;letter-spacing:.4px;font-weight:500;font-size:13px}
@@ -195,8 +184,8 @@ td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;ma
 .wrap[data-app="hass_ui"] .catb{text-transform:none;letter-spacing:0}`;
 
 this.shadowRoot.innerHTML=`<style>${S}</style>
-<div class="wrap" data-app="${app}">
-<div class="hbar"><div class="htitle"><span class="dot"></span>${this._c.title}</div><div class="hmeta" id="meta"></div></div>
+<div class="wrap" data-app="${this._esc(app)}">
+<div class="hbar"><div class="htitle"><span class="dot"></span>${this._esc(this._c.title)}</div><div class="hmeta" id="meta"></div></div>
 <div class="tbar" id="tabs"></div>
 <div class="toolbar" id="toolbar">
 <input class="finput" id="filter" placeholder="Search all columns…"/>
@@ -212,7 +201,7 @@ this.shadowRoot.innerHTML=`<style>${S}</style>
 
 this.shadowRoot.getElementById("filter").addEventListener("input",e=>{this._fText=e.target.value;this._update()});
 this.shadowRoot.getElementById("refreshBtn").addEventListener("click",()=>this._fetch());
-this.shadowRoot.getElementById("dlBtn").addEventListener("click",()=>{window.open(this._tab==="ALARM"?this._c.alarm_csv:this._c.log_csv,"_blank")});
+this.shadowRoot.getElementById("dlBtn").addEventListener("click",()=>this._download());
 this.shadowRoot.getElementById("filterToggle").addEventListener("click",()=>{this._filtersOpen=!this._filtersOpen;this._updatePanel()});
 this._renderTabs()}
 
@@ -244,9 +233,9 @@ const presets=[{l:"Today",f:fmt(today),t:fmt(today)},{l:"7d",f:fmt(new Date(toda
 let clsH="";if(this._tab==="ALARM"&&cls.length){clsH=`<div class="fgrp"><div class="flbl">Alarm Class</div><div class="chips" id="clsC">${cls.map(c=>{
 const s=this._fClass.has(c)?"sel":"";const cc=c==="01"?"c01":c==="02"?"c02":c==="03"?"c03":"";
 const l=c==="01"?"01 Crit":c==="02"?"02 Major":c==="03"?"03 Minor":c;
-return`<span class="chip ${cc} ${s}" data-v="${c}">${l}</span>`}).join("")}</div></div>`}
-let catH="";if(cats.length){catH=`<div class="fgrp"><div class="flbl">Category</div><div class="chips" id="catC">${cats.map(c=>`<span class="chip ${this._fCat.has(c)?"sel":""}" data-v="${c}">${c}</span>`).join("")}</div></div>`}
-let entH="";if(ents.length){entH=`<div class="fgrp"><div class="flbl">Entity</div><div class="chips" id="entC">${ents.map(e=>`<span class="chip ${this._fEnt.has(e)?"sel":""}" data-v="${e}">${e.replace("hass_console.","")}</span>`).join("")}</div></div>`}
+return`<span class="chip ${cc} ${s}" data-v="${this._escAttr(c)}">${this._esc(l)}</span>`}).join("")}</div></div>`}
+let catH="";if(cats.length){catH=`<div class="fgrp"><div class="flbl">Category</div><div class="chips" id="catC">${cats.map(c=>`<span class="chip ${this._fCat.has(c)?"sel":""}" data-v="${this._escAttr(c)}">${this._esc(c)}</span>`).join("")}</div></div>`}
+let entH="";if(ents.length){entH=`<div class="fgrp"><div class="flbl">Entity</div><div class="chips" id="entC">${ents.map(e=>`<span class="chip ${this._fEnt.has(e)?"sel":""}" data-v="${this._escAttr(e)}">${this._esc(e.replace("hass_console.",""))}</span>`).join("")}</div></div>`}
 const pbtns=presets.map(pr=>`<button class="pbtn ${this._fFrom===pr.f&&this._fTo===pr.t?"active":""}" data-f="${pr.f}" data-t="${pr.t}">${pr.l}</button>`).join("");
 
 p.innerHTML=`<div class="fgrid">${clsH}${catH}${entH}<div class="fgrp"><div class="flbl">Date Range</div><div class="drow"><input type="date" class="fdate" id="df" value="${this._fFrom}"/><span>→</span><input type="date" class="fdate" id="dt" value="${this._fTo}"/></div><div class="prow">${pbtns}</div></div></div><div class="factions"><button class="fclr" id="fclr">✕ Clear All</button></div>`;
@@ -263,7 +252,7 @@ if(this._fClass.size)tags.push({l:`Class: ${[...this._fClass]}`,c:()=>this._fCla
 if(this._fCat.size)tags.push({l:`Cat: ${[...this._fCat]}`,c:()=>this._fCat.clear()});
 if(this._fEnt.size)tags.push({l:`Ent: ${[...this._fEnt].map(e=>e.replace("hass_console.",""))}`,c:()=>this._fEnt.clear()});
 if(this._fFrom||this._fTo)tags.push({l:`Date: ${this._fFrom||"…"}→${this._fTo||"…"}`,c:()=>{this._fFrom="";this._fTo=""}});
-el.innerHTML=tags.map((t,i)=>`<span class="ftag">${t.l}<span class="x" data-i="${i}">✕</span></span>`).join("");
+el.innerHTML=tags.map((t,i)=>`<span class="ftag">${this._esc(t.l)}<span class="x" data-i="${i}">✕</span></span>`).join("");
 el.querySelectorAll(".x").forEach(x=>x.addEventListener("click",()=>{tags[parseInt(x.dataset.i)]?.c();this._updatePanel();this._update()}))}
 
 _cols(){
@@ -305,10 +294,11 @@ if(k==="category"&&v)return`<span class="catb">${this._esc(v)}</span>`;
 if(k==="entity"&&v)return this._esc(v.replace("hass_console.",""));
 return this._esc(v)}
 
-_esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+_esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML}
+_escAttr(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 getCardSize(){return 8}
 disconnectedCallback(){if(this._timer)clearInterval(this._timer)}
-static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/local/hass-console/alarms.csv",log_csv:"/local/hass-console/logs.csv",rows:200,refresh_interval:30,appearance:"hass_ui"}}
+static getStubConfig(){return{title:"HASS Console",show_alarm:true,show_log:true,alarm_csv:"/api/hass_console/alarm",log_csv:"/api/hass_console/log",rows:200,refresh_interval:30,appearance:"hass_ui"}}
 }
 
 if(!customElements.get("hass-console-card")){

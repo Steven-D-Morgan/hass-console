@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.3.0](#v330--2026-11-02) | 2026-11-02 | Security hardening — authenticated CSV endpoint, path-traversal fix, admin-only services, Lovelace card XSS fix |
 | [v3.2.1](#v321--2026-09-24) | 2026-09-24 | `appearance: hass_ui` is now the default; opt back into the Niagara look with `appearance: default` |
 | [v3.2.0](#v320--2026-09-24) | 2026-09-24 | Card `appearance: hass_ui` — native Home Assistant look for both cards |
 | [v3.1.0](#v310--2026-08-25) | 2026-08-25 | AND-conditions editor in the UI; one-click YAML import via Repairs |
@@ -29,6 +30,19 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
 
 ---
+
+## v3.3.0 — 2026-11-02
+
+### 🔒 Security hardening
+
+Three issues flagged in the HACS submission review (hacs/default#13009) by `@frenck`. All three affect existing 3.x installs — upgrading is strongly recommended.
+
+- **CSV data is no longer served without authentication.** Pre-3.3.0 defaults put the alarm and log CSVs under `/config/www/hass-console/`, which Home Assistant serves at `/local/` with no auth check — anyone who could reach the HA instance could download the full alarm and log history, including whatever entity values are logged there (vehicle location, utility readings, anything). 3.3.0 moves the default location to the integration's own data directory (`/config/hass_console/`) and serves it through a new authenticated endpoint at `/api/hass_console/alarm` and `/api/hass_console/log`. New installs are safe by default. Existing installs with paths set under `/config/www/` get a Repairs issue pointing at the exact files and how to relocate them; see the README's "Relocating CSVs off `/local/`" section for the one-time cleanup.
+- **Path traversal in `write_log` / `write_alarm` services closed.** Pre-3.3.0 these services accepted an arbitrary `target_csv` value, which `_resolve_csv_path` used as-is for absolute paths and joined without checking for relative ones — a non-admin user could call `write_alarm` with `target_csv: ../configuration.yaml` and the alarm handler would append CSV rows to `configuration.yaml`, then `acknowledge_all` would rewrite it as an alarm CSV. 3.3.0 restricts `target_csv` to bare filenames (no `/`, `\`, or `..`), resolved against the integration data directory; anything else raises a `ServiceValidationError`. Automations that previously supplied absolute or nested paths need updating to use a bare filename or omit the parameter.
+- **Services registered as admin.** `write_log`, `write_alarm`, `acknowledge_alarm`, `acknowledge_all` and `reload` are now admin-only. Non-admin users calling them get an unauthorized response.
+- **Lovelace card XSS fixed.** The card previously injected the configured title, filter chips (`class`, `category`, `entity` values), and footer tags into `innerHTML` without escaping. CSV values come from service data that any user with write access can set, so a crafted entity or category string could run script in every dashboard that opened the card. All interpolations into DOM are now escaped (text through `_esc`, attribute values through a new `_escAttr` helper that quotes `"`, `&`, `<`, `>`).
+
+Internal: new `HassConsoleDataView` HTTP view, `HassConsoleEngine._data_dir` resolved from `hass.config.path("hass_console")`, Repairs issue `legacy_www_path` for existing `/config/www/` configurations, bundled Lovelace card bumped to 3.3.0.
 
 ## v3.2.1 — 2026-09-24
 

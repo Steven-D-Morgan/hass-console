@@ -11,8 +11,9 @@ from typing import Any
 
 import voluptuous as vol
 import yaml
+from aiohttp import web
 
-from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.loader import async_get_integration
 from homeassistant.const import (
@@ -20,7 +21,8 @@ from homeassistant.const import (
     CONF_ABOVE, CONF_BELOW, CONF_FOR,
     EVENT_HOMEASSISTANT_STARTED,
 )
-from homeassistant.core import HomeAssistant, callback, Event, State
+from homeassistant.core import HomeAssistant, callback, Event, State, ServiceCall
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_component import EntityComponent
@@ -28,6 +30,7 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
@@ -40,8 +43,9 @@ from .const import (
     CONF_RETENTION_DAYS, CONF_MAX_ROWS,
     DEFAULT_CONSOLE_YAML, DEFAULT_ALARM_CSV, DEFAULT_LOG_CSV,
     DEFAULT_RETENTION_DAYS, DEFAULT_MAX_ROWS,
+    DATA_SUBDIR,
     ALARM_COLUMNS, LOG_COLUMNS, TIMESTAMP_FORMAT, TYPE_LOG, TYPE_ALARM,
-    ISSUE_INVALID_CONFIG, ISSUE_YAML_DEPRECATED,
+    ISSUE_INVALID_CONFIG, ISSUE_YAML_DEPRECATED, ISSUE_LEGACY_WWW_PATH,
     SUBENTRY_LOG, SUBENTRY_ALARM,
     PLATFORM_NUMERIC, PLATFORM_STATE, SUPPORTED_PLATFORMS,
 )
@@ -65,7 +69,6 @@ DOW_NAMES = {
 
 
 def _cron_token(tok: str, names: dict[str, int] | None) -> int:
-    """Translate a single cron token to an int, honoring name aliases."""
     tok = tok.strip().lower()
     if names and tok in names:
         return names[tok]
@@ -133,7 +136,6 @@ def _gen_id() -> str:
 
 
 def _check_numeric(state_val: str, above, below) -> bool:
-    """Check if a numeric value exceeds above/below thresholds."""
     try:
         val = float(state_val)
     except (ValueError, TypeError):
@@ -146,7 +148,6 @@ def _check_numeric(state_val: str, above, below) -> bool:
 
 
 def _check_state_match(new_state: str, old_state: str | None, to_val, from_val) -> bool:
-    """Check if a state transition matches to/from criteria."""
     if to_val is not None:
         to_list = to_val if isinstance(to_val, list) else [str(to_val)]
         if new_state not in [str(v) for v in to_list]:
@@ -172,8 +173,9 @@ class HassConsoleEngine:
         self.points: dict[str, dict] = {}
         self._alarm_states: dict[str, dict] = {}
         self._unsub_listeners: list = []
-        self._alarm_csv = Path(alarm_csv_path)
-        self._log_csv = Path(log_csv_path)
+        self._data_dir = Path(hass.config.path(DATA_SUBDIR))
+        self._alarm_csv = self._initial_path(alarm_csv_path, DEFAULT_ALARM_CSV)
+        self._log_csv = self._initial_path(log_csv_path, DEFAULT_LOG_CSV)
         self._log_files: set[Path] = {self._log_csv}
         self._alarm_files: set[Path] = {self._alarm_csv}
         self._file_locks: dict[str, asyncio.Lock] = {}
@@ -183,9 +185,25 @@ class HassConsoleEngine:
         self._entities: dict[str, HassConsolePointEntity] = {}
         self._config_problems: list[str] = []
 
+    def _initial_path(self, user_val: str, default_name: str) -> Path:
+        if not user_val:
+            return self._data_dir / default_name
+        p = Path(user_val)
+        if p.is_absolute():
+            return p
+        if "/" in user_val or "\\" in user_val or ".." in p.parts:
+            _LOGGER.warning(
+                "Rejecting unsafe CSV path %r; using default %s",
+                user_val, default_name,
+            )
+            return self._data_dir / default_name
+        return self._data_dir / user_val
+
     async def async_setup(self) -> None:
         self._parse_points()
+        await self.hass.async_add_executor_job(self._ensure_data_dir)
         await self.hass.async_add_executor_job(self._ensure_csvs)
+        self._report_legacy_www_paths()
         await self._register_entities()
         await self._setup_cron_scanner()
         self._setup_alarm_listeners()
@@ -198,12 +216,43 @@ class HassConsoleEngine:
             len(self.points), len(self._log_files), len(self._alarm_files),
         )
 
+    def _ensure_data_dir(self) -> None:
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+
+    def _report_legacy_www_paths(self) -> None:
+        www_root = Path(self.hass.config.path("www")).resolve()
+        exposed: list[str] = []
+        for p in {*self._log_files, *self._alarm_files}:
+            try:
+                if p.resolve().is_relative_to(www_root):
+                    exposed.append(str(p))
+            except (OSError, ValueError):
+                continue
+        if not exposed:
+            ir.async_delete_issue(self.hass, DOMAIN, ISSUE_LEGACY_WWW_PATH)
+            return
+        ir.async_create_issue(
+            self.hass, DOMAIN, ISSUE_LEGACY_WWW_PATH,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_LEGACY_WWW_PATH,
+            translation_placeholders={
+                "paths": ", ".join(sorted(exposed)),
+                "data_dir": str(self._data_dir),
+            },
+            learn_more_url="https://github.com/Steven-D-Morgan/hass-console#relocating-csvs-off-local",
+        )
+
 
     def _resolve_csv_path(self, target: str, default_path: Path) -> Path:
         if not target:
             return default_path
-        p = Path(target)
-        return p if p.is_absolute() else default_path.parent / target
+        if "/" in target or "\\" in target or ".." in Path(target).parts:
+            raise ServiceValidationError(
+                f"target_csv must be a bare filename inside the integration data "
+                f"directory (no path separators or '..'), got {target!r}"
+            )
+        return self._data_dir / target
 
     def _lock_for(self, path: Path) -> asyncio.Lock:
         key = str(path)
@@ -323,7 +372,6 @@ class HassConsoleEngine:
 
     @callback
     def _report_config_problems(self) -> None:
-        """Raise (or clear) a Repairs issue summarizing invalid config points."""
         if self._config_problems:
             for p in self._config_problems:
                 _LOGGER.warning("HASS Console config: %s", p)
@@ -342,13 +390,6 @@ class HassConsoleEngine:
 
 
     async def _register_entities(self) -> None:
-        """Create one HA entity per configured point (LOG and ALARM).
-
-        Entities keep the documented ``hass_console.<type>_<name>`` IDs, gain
-        unique IDs + registry entries, and restore their last value across
-        restarts. They are created up front so they exist before the first
-        log/alarm fires.
-        """
         if self._component is None:
             return
         entities: list[HassConsolePointEntity] = []
@@ -430,14 +471,6 @@ class HassConsoleEngine:
 
     @callback
     def _initial_alarm_eval(self) -> None:
-        """Check current state of all alarm entities on startup.
-
-        If an entity is already in an alarm condition when the engine
-        starts (e.g. door was already open), start the duration timer
-        immediately so the alarm fires after the configured 'for' period.
-        Without this, the engine would miss alarm conditions that existed
-        before startup.
-        """
         now = dt_util.now()
         for key, a in self._alarm_states.items():
             entity_id = a["entity_id"]
@@ -474,13 +507,6 @@ class HassConsoleEngine:
                 )
 
     def _setup_alarm_duration_checker(self) -> None:
-        """Run every 30 seconds to check if any active alarm has exceeded its duration.
-
-        This is needed because state triggers (e.g. door open) don't fire
-        repeated events while the entity sits in the same state. Without
-        this checker, the 'for' duration would never be evaluated for
-        entities that don't change state frequently.
-        """
         @callback
         def _check_durations(now):
             for key, a in self._alarm_states.items():
@@ -577,7 +603,6 @@ class HassConsoleEngine:
             a["recorded"] = False
 
     def _check_condition(self, cond: dict) -> bool:
-        """Evaluate an AND condition against current entity state."""
         entity_id = cond.get("entity_id")
         if not entity_id:
             return True
@@ -649,7 +674,6 @@ class HassConsoleEngine:
 
     @callback
     def _set_point_state(self, point, state, attributes) -> None:
-        """Update a point's entity, falling back to a raw state write."""
         ent = self._entities.get(point["name"])
         if ent is not None:
             ent.update_value(state, attributes)
@@ -734,7 +758,6 @@ class HassConsoleEngine:
 
 
     def _setup_retention(self) -> None:
-        """Prune old rows daily. Disabled entirely when both limits are 0."""
         if self._retention_days <= 0 and self._max_rows <= 0:
             return
 
@@ -831,7 +854,6 @@ def _get_active_engine(hass):
 
 
 def _get_component(hass) -> EntityComponent:
-    """Return the shared entity component, creating it once per hass."""
     data = hass.data.setdefault(DOMAIN, {})
     component = data.get("_component")
     if component is None:
@@ -840,8 +862,37 @@ def _get_component(hass) -> EntityComponent:
     return component
 
 
+def _register_data_view(hass: HomeAssistant) -> None:
+    data = hass.data.setdefault(DOMAIN, {})
+    if data.get("_data_view_registered"):
+        return
+    hass.http.register_view(HassConsoleDataView(hass))
+    data["_data_view_registered"] = True
+
+
+class HassConsoleDataView(HomeAssistantView):
+    url = "/api/hass_console/{kind}"
+    name = "api:hass_console:data"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request, kind: str) -> web.StreamResponse:
+        if kind not in ("alarm", "log"):
+            return web.Response(status=404)
+        engine = _get_active_engine(self.hass)
+        if engine is None:
+            return web.Response(status=404)
+        path = engine._alarm_csv if kind == "alarm" else engine._log_csv
+        if not path.exists():
+            return web.Response(status=404)
+        return web.FileResponse(
+            path, headers={"Cache-Control": "no-store", "Content-Type": "text/csv"}
+        )
+
+
 async def _async_register_frontend(hass) -> None:
-    """Serve the bundled cards and register them as Lovelace resources (once per hass)."""
     data = hass.data.setdefault(DOMAIN, {})
     if data.get("_frontend_registered"):
         return
@@ -862,7 +913,6 @@ async def _async_register_frontend(hass) -> None:
 
 
 async def _async_register_card_resources(hass) -> None:
-    """Add the bundled cards to Lovelace resources, idempotently (storage mode only)."""
     lovelace = hass.data.get("lovelace")
     if lovelace is None:
         return
@@ -916,6 +966,7 @@ async def _async_register_card_resources(hass) -> None:
 async def async_setup(hass, config):
     _register_services(hass)
     await _async_register_frontend(hass)
+    _register_data_view(hass)
     if DOMAIN not in config:
         return True
     component = _get_component(hass)
@@ -1005,7 +1056,7 @@ async def async_unload_entry(hass, entry):
     return True
 
 
-async def async_migrate_entry(hass, entry) -> bool:  # noqa: ARG001
+async def async_migrate_entry(hass, entry) -> bool:
     return True
 
 
@@ -1073,14 +1124,14 @@ def _register_services(hass):
             await engine.async_teardown()
             await engine.async_setup()
 
-    hass.services.async_register(DOMAIN, "write_log", _svc_write_log, schema=vol.Schema({
+    async_register_admin_service(hass, DOMAIN, "write_log", _svc_write_log, schema=vol.Schema({
         vol.Required("entity"): cv.string,
         vol.Optional("category", default=""): cv.string,
         vol.Optional("value", default=""): cv.string,
         vol.Optional("note", default=""): cv.string,
         vol.Optional("target_csv", default=""): cv.string,
     }))
-    hass.services.async_register(DOMAIN, "write_alarm", _svc_write_alarm, schema=vol.Schema({
+    async_register_admin_service(hass, DOMAIN, "write_alarm", _svc_write_alarm, schema=vol.Schema({
         vol.Required("entity"): cv.string,
         vol.Optional("category", default=""): cv.string,
         vol.Optional("class", default=""): cv.string,
@@ -1090,11 +1141,11 @@ def _register_services(hass):
         vol.Optional("trigger", default=""): cv.string,
         vol.Optional("target_csv", default=""): cv.string,
     }))
-    hass.services.async_register(DOMAIN, "acknowledge_alarm", _svc_ack, schema=vol.Schema({
+    async_register_admin_service(hass, DOMAIN, "acknowledge_alarm", _svc_ack, schema=vol.Schema({
         vol.Required("id"): cv.string,
         vol.Optional("note", default=""): cv.string,
     }))
-    hass.services.async_register(DOMAIN, "acknowledge_all", _svc_ack_all, schema=vol.Schema({
+    async_register_admin_service(hass, DOMAIN, "acknowledge_all", _svc_ack_all, schema=vol.Schema({
         vol.Optional("note", default=""): cv.string,
     }))
-    hass.services.async_register(DOMAIN, "reload", _svc_reload)
+    async_register_admin_service(hass, DOMAIN, "reload", _svc_reload, schema=vol.Schema({}))

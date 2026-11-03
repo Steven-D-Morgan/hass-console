@@ -105,9 +105,25 @@ The Lovelace cards are bundled with the integration and **register themselves** 
 
 Re-copy `custom_components/hass_console/` over the old folder (or update through HACS), then restart Home Assistant. The cards update themselves — their auto-loaded URL is versioned, so it cache-busts on every release with no manual re-copy or hard-refresh.
 
+**Upgrading to 3.3.0 (security release — IMPORTANT):** three security fixes land in this release.
+- **Public data exposure:** the default location for the alarm and log CSVs moves out of `/config/www/` (served without auth at `/local/`) and into the integration's own data directory, served through an authenticated endpoint at `/api/hass_console/{alarm,log}`. New installs are safe by default; **existing installs** keep their configured paths, but if any of them are still under `/config/www/`, a Repairs issue appears pointing you at the exact files and how to relocate them.
+- **Path traversal in services:** the `target_csv` parameter on `write_log` / `write_alarm` now accepts only bare filenames (no path separators, no `..`); automations that previously supplied absolute paths or relative paths with separators will raise a validation error and need updating to use a bare filename or omit the parameter.
+- **Admin-only services:** `write_log`, `write_alarm`, `acknowledge_alarm`, `acknowledge_all` and `reload` are now registered as admin services. Non-admin users calling them get an unauthorized response.
+- **Lovelace card XSS:** the card now escapes CSV-derived values before injecting them into the DOM, closing an injection vector where a crafted entity/category/class string could run script in anyone viewing the dashboard.
+
 **Upgrading from 2.6.0 or earlier:** remove the two HASS Console entries from **Settings → Dashboards → Resources** — the integration now loads the cards for you. If you leave them, the old (pre-2.6.1) card file is unguarded, so it can log an "already defined" error in the browser console and may keep serving a stale cached copy; your dashboard keeps working either way. You can also delete the old `/config/www/hass-console-card.js` and `hass-console-summary-card.js` files.
 
 **Upgrading from 2.x:** existing `console.yaml` points keep working. A Repairs issue appears listing how many points are still YAML-only — since **3.1.0** it has a **Fix** button that creates a UI subentry for each YAML point in one click. `console.yaml` is left untouched; remove the migrated entries yourself when you're ready. UI-added points always take precedence over a same-named YAML point during the transition. YAML support will be removed in a future major release.
+
+### Relocating CSVs off `/local/`
+
+If you have existing CSVs in `/config/www/hass-console/` (the pre-3.3.0 default):
+
+1. Stop Home Assistant (or just the HASS Console integration).
+2. Move each file: `mv /config/www/hass-console/alarms.csv /config/hass_console/alarms.csv` and the same for `logs.csv` plus any custom `target_csv` files.
+3. In **Settings → Devices & Services → HASS Console → Configure**, clear `alarm_csv` and `log_csv` (to use the new defaults under `/config/hass_console/`), or set them to the new absolute paths.
+4. Restart Home Assistant. The Repairs issue clears on next startup.
+5. Update any dashboard card configs pointing at `/local/hass-console/*.csv` — the new URLs are `/api/hass_console/alarm` and `/api/hass_console/log` (both require authentication, which the HA frontend provides automatically via the card). The 3.3.0 cards default to these URLs; you only need to touch config here if you had the paths set explicitly.
 
 ---
 
