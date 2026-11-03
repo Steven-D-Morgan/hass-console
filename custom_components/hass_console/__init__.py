@@ -254,6 +254,21 @@ class HassConsoleEngine:
             )
         return self._data_dir / target
 
+    def _resolve_point_csv_path(
+        self, name: str, target: str, default_path: Path
+    ) -> Path:
+        if not target:
+            return default_path
+        try:
+            return self._resolve_csv_path(target, default_path)
+        except ServiceValidationError:
+            self._config_problems.append(
+                f"'{name}': target_csv {target!r} contains path separators or '..' — "
+                f"falling back to the default file. Edit the point and use a bare "
+                f"filename (no /, \\, or ..) stored in the integration data directory."
+            )
+            return default_path
+
     def _lock_for(self, path: Path) -> asyncio.Lock:
         key = str(path)
         lock = self._file_locks.get(key)
@@ -330,10 +345,10 @@ class HassConsoleEngine:
             eid = f"hass_console.{pt.lower()}_{header.lower()}"
             target = str(pcfg.get(CONF_TARGET_CSV, "")).strip()
             if pt == TYPE_LOG:
-                target_file = self._resolve_csv_path(target, self._log_csv)
+                target_file = self._resolve_point_csv_path(name, target, self._log_csv)
                 self._log_files.add(target_file)
             else:
-                target_file = self._resolve_csv_path(target, self._alarm_csv)
+                target_file = self._resolve_point_csv_path(name, target, self._alarm_csv)
                 self._alarm_files.add(target_file)
             self.points[name] = {
                 "name": name, "header": header, "type": pt, "entity_id": eid,
@@ -867,6 +882,7 @@ def _register_data_view(hass: HomeAssistant) -> None:
     if data.get("_data_view_registered"):
         return
     hass.http.register_view(HassConsoleDataView(hass))
+    hass.http.register_view(HassConsoleFileView(hass))
     data["_data_view_registered"] = True
 
 
@@ -885,7 +901,31 @@ class HassConsoleDataView(HomeAssistantView):
         if engine is None:
             return web.Response(status=404)
         path = engine._alarm_csv if kind == "alarm" else engine._log_csv
-        if not path.exists():
+        if not await self.hass.async_add_executor_job(path.exists):
+            return web.Response(status=404)
+        return web.FileResponse(
+            path, headers={"Cache-Control": "no-store", "Content-Type": "text/csv"}
+        )
+
+
+class HassConsoleFileView(HomeAssistantView):
+    url = "/api/hass_console/file/{name}"
+    name = "api:hass_console:file"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request, name: str) -> web.StreamResponse:
+        if not name or "/" in name or "\\" in name or ".." in Path(name).parts:
+            return web.Response(status=404)
+        engine = _get_active_engine(self.hass)
+        if engine is None:
+            return web.Response(status=404)
+        path = engine._data_dir / name
+        if path not in engine._log_files and path not in engine._alarm_files:
+            return web.Response(status=404)
+        if not await self.hass.async_add_executor_job(path.exists):
             return web.Response(status=404)
         return web.FileResponse(
             path, headers={"Cache-Control": "no-store", "Content-Type": "text/csv"}

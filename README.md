@@ -74,7 +74,7 @@ HASS Console is a custom integration (domain: `hass_console`) with three parts:
 │          │                           │                       │
 │          ▼                           ▼                       │
 │  logs.csv       alarms.csv         │
-│  /config/www/                /config/www/                    │
+│  /config/hass_console/       /config/hass_console/           │
 └──────────────────────────────────────────────────────────────┘
                │
                ▼
@@ -556,11 +556,11 @@ By default, all LOG points write to `logs.csv` and all ALARM points write to `al
 
 | `target_csv` value | Resolves to | Accessible at |
 |--------------------|-------------|---------------|
-| `electrical_meters.csv` | `/config/www/hass-console/electrical_meters.csv` | `/local/hass-console/electrical_meters.csv` |
-| `subfolder/meters.csv` | `/config/www/hass-console/subfolder/meters.csv` | `/local/hass-console/subfolder/meters.csv` |
-| `/config/logs/meters.csv` | `/config/logs/meters.csv` | (not web-accessible) |
+| `electrical_meters.csv` | `/config/hass_console/electrical_meters.csv` | `/api/hass_console/file/electrical_meters.csv` (authenticated) |
+| `subfolder/meters.csv` | rejected — the subentry form shows a validation error, and if YAML has one it falls back to the default log/alarm file and raises a Repairs issue | — |
+| `/config/logs/meters.csv` | rejected — same as above | — |
 
-A bare filename lands next to the default CSVs (in `/config/www/hass-console/`) so it's reachable at a `/local/hass-console/` URL. An absolute path is used as-is.
+`target_csv` must be a bare filename (no `/`, `\`, or `..`) — it always lands in the integration's data directory (`/config/hass_console/`). The authenticated endpoint `/api/hass_console/file/<name>` serves any registered custom file so cards can view it. Nothing is written outside the data directory, and the file is never served under `/local/`.
 
 ### Example
 
@@ -591,16 +591,16 @@ The custom file uses the same schema as the default file for its type (LOG or AL
 
 ### Viewing custom files in the card
 
-The main card shows the default alarm and log CSVs. To view a custom file, add a second card instance pointing at it:
+The main card shows the default alarm and log CSVs. To view a custom file, add a second card instance pointing at the authenticated `/api/hass_console/file/<name>` endpoint:
 
 ```yaml
 type: custom:hass-console-card
 title: Electrical Meters
-log_csv: /local/hass-console/electrical_meters.csv
-alarm_csv: /local/hass-console/alarms.csv
+log_csv: /api/hass_console/file/electrical_meters.csv
+alarm_csv: /api/hass_console/alarm
 ```
 
-The card always renders both tabs, so set `log_csv` (or `alarm_csv`) to your custom file and leave the other pointing at a default.
+The card always renders both tabs, so set `log_csv` (or `alarm_csv`) to your custom file and leave the other pointing at a default. The endpoint only serves CSVs that an active point or service call has registered — unknown filenames return 404.
 
 ---
 
@@ -650,7 +650,7 @@ The `ack` column is empty for unacknowledged alarms and contains the acknowledgm
 
 ## CSV Output
 
-Two separate CSV files in `/config/www/`, accessible at `/local/` URLs:
+Two separate CSV files in the integration data directory (`/config/hass_console/`), served to the cards through authenticated endpoints at `/api/hass_console/alarm` and `/api/hass_console/log`:
 
 ### alarms.csv
 
@@ -719,8 +719,8 @@ alarms and log rows age out. Both settings apply to every CSV in use, including 
 ```yaml
 type: custom:hass-console-card
 title: HASS Console
-alarm_csv: /local/hass-console/alarms.csv
-log_csv: /local/hass-console/logs.csv
+alarm_csv: /api/hass_console/alarm
+log_csv: /api/hass_console/log
 rows: 200
 refresh_interval: 30
 theme: auto
@@ -732,8 +732,8 @@ show_log: true
 | Key | Default | Description |
 |-----|---------|-------------|
 | `title` | HASS Console | Card header text |
-| `alarm_csv` | `/local/hass-console/alarms.csv` | URL to alarm CSV |
-| `log_csv` | `/local/hass-console/logs.csv` | URL to log CSV |
+| `alarm_csv` | `/api/hass_console/alarm` | Authenticated URL for the alarm CSV. For a custom target file, use `/api/hass_console/file/<name>`. |
+| `log_csv` | `/api/hass_console/log` | Authenticated URL for the log CSV. For a custom target file, use `/api/hass_console/file/<name>`. |
 | `rows` | 200 | Max rows to display per tab |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
 | `theme` | auto | `auto` (follows HA theme), `dark`, or `light` — dark/light mode following |
@@ -770,7 +770,7 @@ show_log: false
 type: custom:hass-console-card
 title: Electrical Meters
 show_alarm: false
-log_csv: /local/hass-console/electrical_meters.csv
+log_csv: /api/hass_console/file/electrical_meters.csv
 ```
 
 ### Features
@@ -812,7 +812,7 @@ The summary card is bundled with the integration and loads automatically — no 
 
 ```yaml
 type: custom:hass-console-summary-card
-alarm_csv: /local/hass-console/alarms.csv
+alarm_csv: /api/hass_console/alarm
 refresh_interval: 30
 theme: auto
 appearance: hass_ui
@@ -820,7 +820,7 @@ appearance: hass_ui
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `alarm_csv` | `/local/hass-console/alarms.csv` | URL to alarm CSV |
+| `alarm_csv` | `/api/hass_console/alarm` | Authenticated URL for the alarm CSV. For a custom alarm file, use `/api/hass_console/file/<name>`. |
 | `refresh_interval` | 30 | Seconds between auto-refresh |
 | `theme` | auto | `auto`, `dark`, or `light` — dark/light mode following |
 | `appearance` | hass_ui | `hass_ui` (native HA state colors, no glow — default) or `default` (Niagara look with pulsing glow) |
@@ -858,7 +858,7 @@ data:
 | category | No | System type |
 | value | No | Value to record |
 | note | No | Description |
-| target_csv | No | Custom CSV filename or absolute path |
+| target_csv | No | Custom CSV filename — bare filename only, no path separators |
 
 ### hass_console.write_alarm
 
@@ -884,7 +884,7 @@ data:
 | duration | No | Duration string |
 | note | No | Description |
 | trigger | No | What caused the alarm |
-| target_csv | No | Custom CSV filename or absolute path |
+| target_csv | No | Custom CSV filename — bare filename only, no path separators |
 
 ### hass_console.acknowledge_alarm
 
@@ -1012,7 +1012,7 @@ Full end-to-end point sets — the kind of `console.yaml` block you'd drop into 
 
 ## Troubleshooting
 
-**No CSV files created** — The engine creates CSVs on first startup. Check that `/config/www/` exists. Look at the HA log for `hass_console` entries.
+**No CSV files created** — The engine creates CSVs on first startup inside `/config/hass_console/`. If the directory is missing, check that `hass_console` is listed under **Settings → Devices & Services** and look at the HA log for `hass_console` entries.
 
 **Cron not firing** — Wrap cron expressions in quotes in YAML. The scanner runs every 60 seconds so there can be up to a 60-second delay. Enable debug logging:
 ```yaml
@@ -1023,7 +1023,7 @@ logger:
 
 **Alarm not triggering** — Verify the entity reports a numeric state (check Developer Tools → States). `unavailable` and `unknown` states are skipped. Make sure `entity_id` inside the trigger matches the real entity.
 
-**Card shows "No entries yet"** — Click ↻ Refresh. Verify the CSV URLs in the card config. Open the URL directly in a browser to check the file.
+**Card shows "No entries yet"** — Click ↻ Refresh. Verify the CSV URLs in the card config point at `/api/hass_console/alarm`, `/api/hass_console/log`, or `/api/hass_console/file/<name>` (the endpoints require authentication, so loading them in a logged-in browser tab is the easiest way to confirm the file exists).
 
 **Card not loading** — The integration registers the cards as Lovelace resources automatically on storage-mode dashboards. If they don't appear: confirm the integration is installed and HA was restarted, then hard-refresh (Ctrl+Shift+R). If your dashboards use **YAML mode**, add the two `/hass_console_frontend/…` URLs (from the HA log) as `JavaScript Module` resources. If you upgraded from an earlier version, also remove any old `/local/hass-console-*.js` resource entries so a stale cached copy isn't loaded instead.
 

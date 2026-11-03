@@ -71,6 +71,13 @@ def _validate_paths(data: dict[str, Any]) -> dict[str, str]:
     return errors
 
 
+def _target_csv_invalid(value: str) -> bool:
+    v = (value or "").strip()
+    if not v:
+        return False
+    return "/" in v or "\\" in v or v == ".."
+
+
 def _normalize_name(raw: str) -> str:
     cleaned = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in raw.strip())
     return cleaned.upper().strip("_")
@@ -244,6 +251,8 @@ class LogPointSubentryFlow(ConfigSubentryFlow):
                 errors[CONF_CRON] = "cron_required"
             if not user_input.get(CONF_ENTITY, "").strip():
                 errors[CONF_ENTITY] = "entity_required"
+            if _target_csv_invalid(user_input.get(CONF_TARGET_CSV, "")):
+                errors[CONF_TARGET_CSV] = "invalid_target_csv"
 
             if not errors:
                 data = {
@@ -385,6 +394,8 @@ class AlarmPointSubentryFlow(ConfigSubentryFlow):
                 errors[CONF_NAME] = "name_taken"
             elif self._reconfigure and name != current.get(CONF_NAME) and _name_taken(self, name):
                 errors[CONF_NAME] = "name_taken"
+            if _target_csv_invalid(user_input.get(CONF_TARGET_CSV, "")):
+                errors[CONF_TARGET_CSV] = "invalid_target_csv"
 
             if not errors:
                 self._data.update({

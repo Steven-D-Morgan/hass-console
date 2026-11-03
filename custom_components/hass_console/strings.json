@@ -60,7 +60,7 @@
             "entity": "Entity to snapshot",
             "category": "Category (optional — HVAC, E-METER, GPS, …)",
             "note": "Note (optional — static text in the Note column)",
-            "target_csv": "Custom CSV file (optional — bare filename or absolute path)"
+            "target_csv": "Custom CSV file (optional — bare filename, no path separators)"
           }
         },
         "reconfigure": {
@@ -80,7 +80,8 @@
         "name_required": "Name is required",
         "name_taken": "Another point already uses this name",
         "cron_required": "Cron expression is required",
-        "entity_required": "Entity is required"
+        "entity_required": "Entity is required",
+        "invalid_target_csv": "Target CSV must be a bare filename (no /, \\, or ..)"
       }
     },
     "alarm_point": {
@@ -99,7 +100,7 @@
             "category": "Category (optional — HVAC, SECURITY, E-METER, …)",
             "entity": "Primary entity (optional — informational)",
             "note": "Note (optional — static text in the Note column)",
-            "target_csv": "Custom CSV file (optional — bare filename or absolute path)"
+            "target_csv": "Custom CSV file (optional — bare filename, no path separators)"
           }
         },
         "reconfigure": {
@@ -187,6 +188,7 @@
         "name_required": "Name is required",
         "name_taken": "Another point already uses this name",
         "entity_required": "Entity is required",
+        "invalid_target_csv": "Target CSV must be a bare filename (no /, \\, or ..)",
         "numeric_needs_threshold": "Numeric triggers need an 'above' or 'below' value",
         "state_needs_to": "State triggers need at least one 'to' value",
         "state_needs_value": "State conditions need at least one matching state",

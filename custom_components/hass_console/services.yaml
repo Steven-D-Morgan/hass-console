@@ -26,7 +26,7 @@ write_log:
         text:
     target_csv:
       name: Target CSV
-      description: Optional custom CSV filename (e.g. electrical_meters.csv) or absolute path
+      description: Optional custom CSV filename (bare filename only — no path separators). Stored in the integration data directory alongside the default log file.
       required: false
       example: "electrical_meters.csv"
       selector:
@@ -75,7 +75,7 @@ write_alarm:
         text:
     target_csv:
       name: Target CSV
-      description: Optional custom CSV filename or absolute path
+      description: Optional custom CSV filename (bare filename only — no path separators). Stored in the integration data directory alongside the default alarm file.
       required: false
       example: "hvac_alarms.csv"
       selector:

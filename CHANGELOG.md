@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.3.1](#v331--2026-11-03) | 2026-11-03 | 3.3.0 follow-ups — custom `target_csv` points no longer break setup, data view no longer blocks the event loop, card can view custom files via `/api/hass_console/file/<name>`, docs match the new paths |
 | [v3.3.0](#v330--2026-11-02) | 2026-11-02 | Security hardening — authenticated CSV endpoint, path-traversal fix, admin-only services, Lovelace card XSS fix |
 | [v3.2.1](#v321--2026-09-24) | 2026-09-24 | `appearance: hass_ui` is now the default; opt back into the Niagara look with `appearance: default` |
 | [v3.2.0](#v320--2026-09-24) | 2026-09-24 | Card `appearance: hass_ui` — native Home Assistant look for both cards |
@@ -30,6 +31,20 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
 
 ---
+
+## v3.3.1 — 2026-11-03
+
+### 🧰 3.3.0 follow-ups
+
+Three loose ends from the HACS submission review (hacs/default#13009 round 2) by `@frenck`. All affect existing 3.x installs that carried a non-default `target_csv` value or that opened the HASS Console card frequently.
+
+- **Custom `target_csv` points no longer break setup.** 3.3.0's path validation raised `ServiceValidationError` from `_resolve_csv_path`, which is also called from `_parse_points` at engine startup. Any LOG or ALARM point whose `target_csv` held a nested path (e.g. `subfolder/meters.csv`) or an absolute path — both documented as valid in 3.2.1 — made the config entry fail to set up. `_parse_points` now calls a new `_resolve_point_csv_path` that falls back to the default log/alarm file and records a config problem (which surfaces in the Repairs issue your other invalid points use), so the engine starts and the operator sees exactly which point needs editing. The subentry forms (LOG and ALARM, user + reconfigure) now reject path separators and `..` at submit time with an `invalid_target_csv` form error, so UI points can no longer land in a half-configured state.
+- **The authenticated data view no longer stats on the event loop.** `HassConsoleDataView.get` called `path.exists()` directly in the async handler, which every open card hit on each 30-second refresh. Both the alarm/log view and a new file view now check existence through `hass.async_add_executor_job(path.exists)`.
+- **Custom target files are viewable in the card again.** 3.3.0 served only the two default files through `/api/hass_console/{alarm,log}`, so anyone using `target_csv` lost the "point a card at my meter CSV" workflow. New `HassConsoleFileView` at `/api/hass_console/file/<name>` serves any CSV that an active LOG/ALARM point or `write_alarm` call has registered as a target. The route only accepts bare filenames (no `/`, `\`, or `..`) and only serves files currently in `_log_files` or `_alarm_files`, so unregistered or arbitrary filenames return 404.
+- **README and `services.yaml` match the 3.3.0 semantics.** The custom-target table and example card YAML, the "Viewing custom files in the card" section, the architecture diagram's `logs.csv` / `alarms.csv` paths, the card and summary-card configuration tables, the "CSV Output" section, the services tables, and the troubleshooting notes now describe the data directory, the authenticated endpoints, and the "bare filename only" rule. `services.yaml` descriptions for `target_csv` match.
+- **i18n:** the new `invalid_target_csv` form error added to `strings.json` and `translations/en.json` under both the LOG and ALARM subentry error blocks; the 12 non-English translations will pick it up on the next backfill (missing entries render the key, which falls back to the English string anyway).
+
+Internal: new `HassConsoleEngine._resolve_point_csv_path(name, target, default_path)` wraps `_resolve_csv_path` with a per-point try/except; a `_target_csv_invalid(value)` helper in `config_flow.py` reuses the same `/ \ ..` rejection; `HassConsoleFileView` registered next to `HassConsoleDataView` in `_register_data_view`.
 
 ## v3.3.0 — 2026-11-02
 
