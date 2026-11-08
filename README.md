@@ -95,7 +95,7 @@ Requires Home Assistant **2025.3 or newer** (needed for config subentries). See 
 
 1. Copy `custom_components/hass_console/` → `/config/custom_components/hass_console/` (or install via HACS as a custom repository)
 2. Restart Home Assistant
-3. **Settings → Devices & Services → + Add Integration → HASS Console**
+3. **Settings → Devices & Services → + Add Integration → HASS Console** — since **3.4.0** a fresh install just clicks **Submit**: the default `alarms.csv` / `logs.csv` are created immediately in `/config/hass_console/`, and the legacy Console YAML field only pre-fills when `/config/console.yaml` actually exists
 4. On the integration card, click **ADD** to add LOG points (scheduled snapshots) and ALARM points (threshold alerts)
 5. Add the **HASS Console Card** (and optional **Summary Card**) to a dashboard
 
