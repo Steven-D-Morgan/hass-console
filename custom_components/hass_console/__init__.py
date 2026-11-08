@@ -219,6 +219,10 @@ class HassConsoleEngine:
     def _ensure_data_dir(self) -> None:
         self._data_dir.mkdir(parents=True, exist_ok=True)
 
+    async def async_ensure_files(self) -> None:
+        await self.hass.async_add_executor_job(self._ensure_data_dir)
+        await self.hass.async_add_executor_job(self._ensure_csvs)
+
     def _report_legacy_www_paths(self) -> None:
         www_root = Path(self.hass.config.path("www")).resolve()
         exposed: list[str] = []
@@ -1082,6 +1086,7 @@ async def async_setup_entry(hass, entry):
     if hass.is_running:
         await engine.async_setup()
     else:
+        await engine.async_ensure_files()
         async def _start(event):
             await engine.async_setup()
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _start)

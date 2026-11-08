@@ -46,11 +46,12 @@ Settings → System → Restart. A full restart is required because this is a cu
 1. Go to **Settings → Devices & Services**
 2. Click **+ Add Integration** (bottom right)
 3. Search for **HASS Console**
-4. On the setup form, confirm the CSV paths (defaults are usually correct):
-   - **Alarm CSV output path** — `/config/www/hass-console/alarms.csv`
-   - **Log CSV output path** — `/config/www/hass-console/logs.csv`
-   - **Console YAML path** — leave blank if you're not using the legacy YAML file
-5. Click **Submit**
+4. Click **Submit** — since **3.4.0** the defaults are ready to go on a fresh install:
+   - **Alarm CSV output path** — `alarms.csv` (created in `/config/hass_console/`)
+   - **Log CSV output path** — `logs.csv` (created in `/config/hass_console/`)
+   - **Console YAML path** — blank unless a legacy `/config/console.yaml` already exists, in which case it's pre-filled for you
+
+Both CSV files are created immediately with their header rows — nothing to make by hand, and the cards have data files to read from the moment setup finishes.
 
 You'll see a HASS Console card on the Integrations page with an **ADD** button (for new points), a **Configure** button (to change paths later), and a **⋮ → Reload** option.
 
@@ -104,11 +105,11 @@ You now have `hass_console.alarm_temperature_alarm` — an entity that flips to 
 ```yaml
 type: custom:hass-console-card
 title: HASS Console
-alarm_csv: /local/hass-console/alarms.csv
-log_csv: /local/hass-console/logs.csv
 rows: 200
 refresh_interval: 30
 ```
+
+The card reads the default files through the authenticated `/api/hass_console/alarm` and `/api/hass_console/log` endpoints automatically — you only set `alarm_csv` / `log_csv` if you pointed the integration at custom files.
 
 4. Click **Save**
 

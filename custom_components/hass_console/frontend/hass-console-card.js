@@ -1,4 +1,4 @@
-const VER="3.3.2";
+const VER="3.4.0";
 function parseTS(v){if(!v)return null;const n=v.includes(' ')&&!v.includes('T')?v.replace(' ','T'):v;const d=new Date(n);return isNaN(d)?null:d}
 
 class HassConsoleCard extends HTMLElement{

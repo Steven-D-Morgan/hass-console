@@ -6,6 +6,7 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 
 | Version | Date | Summary |
 |---------|------|---------|
+| [v3.4.0](#v340--2026-11-07) | 2026-11-07 | Seamless first-run setup — the add-integration form submits with zero edits on a fresh install (the Console YAML field no longer pre-fills a path that doesn't exist), and the default `alarms.csv` / `logs.csv` are created with headers the moment the entry is added. |
 | [v3.3.2](#v332--2026-11-03) | 2026-11-03 | Card hardening follow-up — `ack_note` tooltip and `data-id` on the ACK button now escape attribute values via `_escAttr` instead of `_esc`. Bundled card version bumped to match the integration. |
 | [v3.3.1](#v331--2026-11-03) | 2026-11-03 | 3.3.0 follow-ups — custom `target_csv` points no longer break setup, data view no longer blocks the event loop, card can view custom files via `/api/hass_console/file/<name>`, docs match the new paths |
 | [v3.3.0](#v330--2026-11-02) | 2026-11-02 | Security hardening — authenticated CSV endpoint, path-traversal fix, admin-only services, Lovelace card XSS fix |
@@ -32,6 +33,20 @@ Scan the table for an at-a-glance history, or jump to any version for the full d
 | [v1.0.0](#v100--2026-06-05) | 2026-06-05 | Initial release |
 
 ---
+
+## v3.4.0 — 2026-11-07
+
+### 🚀 Seamless first-run setup
+
+A brand-new install could not finish the add-integration form without manual edits: the **Console YAML path** field defaulted to `/config/console.yaml`, and since that legacy file doesn't exist on a fresh install, clicking **Submit** returned "Console YAML file not found". Until the field was blanked by hand, the config entry — and therefore the default CSV files — were never created.
+
+- **The Console YAML field now defaults to blank on a fresh install.** It pre-fills `/config/console.yaml` only when that file actually exists (upgraders from 2.x keep the old convenience). A new user clicks **Submit** on the untouched form and setup completes.
+- **Default `alarms.csv` and `logs.csv` are created the moment the entry is added.** Previously, an entry set up while Home Assistant was still starting deferred all file creation to the `EVENT_HOMEASSISTANT_STARTED` listener; a new `async_ensure_files` on the engine now writes the data directory and both header-row CSVs immediately in that case too, so the files exist as soon as the integration appears — before the first point, cron fire, or alarm.
+- **`simple-setup.md` caught up with the 3.3.0 paths.** Step 4 still showed the pre-3.3.0 `/config/www/hass-console/` defaults and Step 6 still configured the card with unauthenticated `/local/` URLs; the guide now shows the real defaults (`alarms.csv` / `logs.csv` in `/config/hass_console/`) and the minimal card config that uses the authenticated `/api/hass_console/{alarm,log}` endpoints the card already defaults to.
+
+### 🔖 Card versions
+
+- `VER` / `SVER` bumped to `3.4.0` in lockstep with the integration.
 
 ## v3.3.2 — 2026-11-03
 

@@ -1,4 +1,4 @@
-const SVER = "3.3.2";
+const SVER = "3.4.0";
 
 class HassConsoleSummaryCard extends HTMLElement {
   constructor() {

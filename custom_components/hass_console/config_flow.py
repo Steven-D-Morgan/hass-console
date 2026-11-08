@@ -71,6 +71,10 @@ def _validate_paths(data: dict[str, Any]) -> dict[str, str]:
     return errors
 
 
+def _default_yaml_path() -> str:
+    return DEFAULT_CONSOLE_YAML if os.path.isfile(DEFAULT_CONSOLE_YAML) else ""
+
+
 def _target_csv_invalid(value: str) -> bool:
     v = (value or "").strip()
     if not v:
@@ -103,10 +107,14 @@ class HassConsoleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
         defaults = user_input or {}
+        if CONF_CONSOLE_YAML in defaults:
+            yaml_default = defaults[CONF_CONSOLE_YAML]
+        else:
+            yaml_default = await self.hass.async_add_executor_job(_default_yaml_path)
         schema = vol.Schema({
             vol.Optional(
                 CONF_CONSOLE_YAML,
-                default=defaults.get(CONF_CONSOLE_YAML, DEFAULT_CONSOLE_YAML),
+                default=yaml_default,
             ): str,
             vol.Required(
                 CONF_ALARM_CSV,
